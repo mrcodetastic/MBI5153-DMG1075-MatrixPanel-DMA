@@ -1,5 +1,5 @@
 # ESP32S3-MBI5153-DMG1075-LED-MatrixPanel
-An experimental Arduino sketch to drive a the eWaste (in the UK) DMG1075 78x78px RGB LED Matrix Panels.
+An experimental Arduino sketch to drive an 'DMG1075' 78x78px RGB LED Matrix Panel (based on the MBI5153).
 
 Based on ESP32S3 only.
 
