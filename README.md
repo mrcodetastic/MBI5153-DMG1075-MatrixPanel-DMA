@@ -4,7 +4,7 @@ An experimental Arduino sketch to drive an 'DMG1075' 78x78px RGB LED Matrix Pane
 Based on ESP32S3 only.
 
 ### Still to do
-* Implement DMA, PWM or RMT based driving based on [advice](https://github.com/mrfaptastic/ESP32-HUB75-MatrixPanel-DMA/discussions/324#discussioncomment-7845435)
+* Implement DMA, PWM or RMT based driving based on [advice](https://github.com/mrfaptastic/ESP32-HUB75-MatrixPanel-DMA/discussions/324#discussioncomment-7845435) (done)
 * Hook it up to a general graphic library, and local 24bit pp buffer.
 
 ### Further Information
