@@ -61,8 +61,6 @@ void mbi_configuration(uint8_t ghost_elimination, uint8_t line_num, uint8_t gray
 
   ESP_LOGD(TAG, "Reg value. %u", config_reg1_val);
 
-  std::printf("Reg value. %u", config_reg1_val);
-
   for (int i = 0; i < PANEL_MBI_LENGTH; i++)
     mbi_send_config(config_reg1_val, (i == (PANEL_MBI_LENGTH - 1)));  // on last panel, latch
 }
@@ -77,9 +75,8 @@ void mbi_configuration2()
 
   config_reg2_val = 0b1001000000011110; // removes ghosting except for red
 
- // config_reg2_val = 0b1001100100011110   ; // removes ghosting except for red
-
   ESP_LOGD(TAG, "Reg2 value. %u", config_reg2_val);
+  
   for (int i = 0; i < PANEL_MBI_LENGTH; i++)
     mbi_send_config(config_reg2_val, (i == (PANEL_MBI_LENGTH - 1)), true);  // on last panel, latch
 }

@@ -25,7 +25,7 @@ volatile int image      = 0;
 bool alloc_dma_data_buffer() 
 { 
     dma_gpio_size        = sizeof(dma_data_nodt);
-    ESP_LOGI("I2S-DMA", "Size of DMA data we need to use to drive is %u.", dma_gpio_size);  
+    ESP_LOGD("I2S-DMA", "Size of DMA data we need to use to drive is %u.", dma_gpio_size);  
     
     // Defined in main.hpp
     dma_gpio_data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_malloc(dma_gpio_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
@@ -37,7 +37,7 @@ bool alloc_dma_data_buffer()
         // TODO: should we release all previous rowBitStructs here???
     }  
 
-    ESP_LOGE("I2S-DMA", "Copying bootstrap DMA data across.");                
+    ESP_LOGD("I2S-DMA", "Copying bootstrap DMA data across.");                
     memcpy(dma_gpio_data, dma_data_nodt, dma_gpio_size);    // Using the same data for now.
 
     return true;
@@ -47,7 +47,7 @@ bool configure_dma_gclk()
 {  
     if ( !alloc_dma_data_buffer() )
     {
-        ESP_LOGI("I2S-DMA", "Failed to allocate DMA memory.");          
+        ESP_LOGE("I2S-DMA", "Failed to allocate DMA memory.");          
         return false;
     }
 
@@ -111,7 +111,6 @@ void setup(void)
         ESP_LOGD(TAG, "Setup MBI5153 with DMA"); 
 
         configure_dma_gclk();  
-        load_dma_data_buffer(true);  
         dma_bus.dma_transfer_start();  // start gclk + addr toggle
       
         // Confiure register1
@@ -149,8 +148,17 @@ void loop()
       }
 
         dma_bus.dma_transfer_stop();          
+
+        /* Need to put a delay in for the moment as when we call dma_transfer_stop() the DMA transfer doesn't actually stop immediately
+         * and continues in an async manner in the background. This causes a stuffup / corruption of pixel data around the time of the immediate vsync 
+         *
+         * Not sure what SRCLK does either, but toggling it high and then low around time of greyscale data transfer stops visible noise showing.
+         */
+        gpio_set_level(MBI_SRCLK,  1);
+        delay(2);     
         mbi_v_sync(); 
         dma_bus.dma_transfer_start();
+        gpio_set_level(MBI_SRCLK,  0);  
 
         image++;
         refresh = 0;
