@@ -1,22 +1,6 @@
 #pragma once
 #include "hal/gpio_types.h"
 
-// DMA engine (if used)
-#define ESP32_I2S_DMA_STORAGE_TYPE uint8_t // DMA output of one uint16_t at a time.
-
-// For DMA GLCK and Address Line Data
-#define BIT_GCLK (1 << 0)
-#define BIT_A (1 << 1)
-#define BIT_B (1 << 2)
-#define BIT_C (1 << 3)
-#define BIT_D (1 << 4)
-#define BIT_E (1 << 5)
-
-// RGB Panel Scan Lines
-#define PANEL_SCAN_LINES        20 // panel scan lines
-#define PANEL_MBI_LENGTH        5  // number of ic's changed for each subpixel
-
-
 // Updated ESP32-S3 Pin GPIO
 /* Experimenting with the ESP32-S3 Dev Module has uncovered that ONLY THESE pins seems to work ok
  * use other pins at your risk. Don't use 19, 20, 48 etc.
@@ -62,3 +46,24 @@
 #define MBI_SPARE4              GPIO_NUM_12
 #define MBI_SPARE5              GPIO_NUM_13
 #define MBI_SPARE6              GPIO_NUM_14
+
+
+// -------------------------------------------------------
+// Internals specific to code and hardware. Do not change.
+// -------------------------------------------------------
+
+// DMA engine (if used)
+#define ESP32_I2S_DMA_STORAGE_TYPE uint8_t // DMA output of one uint16_t at a time.
+
+// For DMA GLCK and Address Line Data
+#define BIT_GCLK (1 << 0)
+#define BIT_A (1 << 1)
+#define BIT_B (1 << 2)
+#define BIT_C (1 << 3)
+#define BIT_D (1 << 4)
+#define BIT_E (1 << 5)
+
+// RGB Panel Scan Lines
+#define PANEL_SCAN_LINES        20 // panel scan lines
+#define PANEL_MBI_LENGTH        5  // number of ic's changed for each subpixel
+
