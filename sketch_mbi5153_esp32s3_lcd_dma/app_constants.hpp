@@ -6,37 +6,56 @@
  * use other pins at your risk. Don't use 19, 20, 48 etc.
  * https://api.riot-os.org/group__cpu__esp32__esp32s3.html
  */
-#define ADDR_A_PIN              GPIO_NUM_5
-#define ADDR_B_PIN              GPIO_NUM_4
-#define ADDR_C_PIN              GPIO_NUM_42
-#define ADDR_D_PIN              GPIO_NUM_7
-#define ADDR_E_PIN              GPIO_NUM_41
 
-#define MBI_GCLK                GPIO_NUM_1  // OE PIN IS GCLK apparently
-#define MBI_GCLK2               GPIO_NUM_9  // OE PIN IS GCLK apparently
-#define MBI_LAT                 GPIO_NUM_6  //  data/command
-#define MBI_DCLK                GPIO_NUM_2  // data clocking line?
-#define MBI_SRCLK               GPIO_NUM_48   // I assume SR stands for Scan Row??  // When this is HIGH on these boards, output is disabled?
+#define GPIO_MAPPING_DEFAULT     1
+#define GPIO_MAPPING_PCB_DEVS3   2
+#define GPIO_MAPPING_PCB_DHRUV   3 
 
-// First 1/4 of panel -> 20 rows
-#define MBI_G1                  GPIO_NUM_40 
-#define MBI_B1                  GPIO_NUM_16 
-#define MBI_R1                  GPIO_NUM_15  
+// Selected mode
+#define GPIO_MAPPING GPIO_MAPPING_DEFAULT
 
-// Second 1/4 of panel -> 20 rows
-#define MBI_G2                  GPIO_NUM_39    
-#define MBI_B2                  GPIO_NUM_17  
-#define MBI_R2                  GPIO_NUM_18  
 
-// Third 1/4 of panel -> 20 rows
-#define MBI_G3                  GPIO_NUM_8  
-#define MBI_B3                  GPIO_NUM_45  
-#define MBI_R3                  GPIO_NUM_46  
+#if (GPIO_MAPPING == GPIO_MAPPING_DEFAULT)
 
-// Forth 1/4 of panel -> 20 rows
-#define MBI_G4                  GPIO_NUM_3    
-#define MBI_B4                  GPIO_NUM_21  
-#define MBI_R4                  GPIO_NUM_47  
+  #define ADDR_A_PIN              GPIO_NUM_5
+  #define ADDR_B_PIN              GPIO_NUM_4
+  #define ADDR_C_PIN              GPIO_NUM_42
+  #define ADDR_D_PIN              GPIO_NUM_7
+  #define ADDR_E_PIN              GPIO_NUM_41
+
+  #define MBI_GCLK                GPIO_NUM_1  // OE PIN IS GCLK apparently
+  #define MBI_LAT                 GPIO_NUM_6  //  data/command
+  #define MBI_DCLK                GPIO_NUM_2  // data clocking line?
+  #define MBI_SRCLK               GPIO_NUM_48   // I assume SR stands for Scan Row??  // When this is HIGH on these boards, output is disabled?
+
+  // First 1/4 of panel -> 20 rows
+  #define MBI_G1                  GPIO_NUM_40 
+  #define MBI_B1                  GPIO_NUM_16 
+  #define MBI_R1                  GPIO_NUM_15  
+
+  // Second 1/4 of panel -> 20 rows
+  #define MBI_G2                  GPIO_NUM_39    
+  #define MBI_B2                  GPIO_NUM_17  
+  #define MBI_R2                  GPIO_NUM_18  
+
+  // Third 1/4 of panel -> 20 rows
+  #define MBI_G3                  GPIO_NUM_8  
+  #define MBI_B3                  GPIO_NUM_45  
+  #define MBI_R3                  GPIO_NUM_46  
+
+  // Forth 1/4 of panel -> 20 rows
+  #define MBI_G4                  GPIO_NUM_3    
+  #define MBI_B4                  GPIO_NUM_21  
+  #define MBI_R4                  GPIO_NUM_47  
+
+#elif (GPIO_MAPPING == GPIO_MAPPING_PCB_DEVS3)  
+// S3-Dev module header / quick and dirty pcb.
+
+#elif (GPIO_MAPPING == GPIO_MAPPING_PCB_DHRUV)  
+
+
+#endif
+
 
 // Spare Unencumbered GPIOS
 // https://api.riot-os.org/group__cpu__esp32__esp32s3.html
