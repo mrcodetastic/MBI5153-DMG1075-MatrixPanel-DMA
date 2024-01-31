@@ -3,7 +3,7 @@
 
 // Updated ESP32-S3 Pin GPIO
 /* Experimenting with the ESP32-S3 Dev Module has uncovered that ONLY THESE pins seems to work ok
- * use other pins at your risk. Don't use 19, 20, 48 etc.
+ * use other pins at your risk. Don't use 0, 19, 20, 26-38 etc.
  * https://api.riot-os.org/group__cpu__esp32__esp32s3.html
  */
 
