@@ -495,13 +495,16 @@ void draw_wireframe(void)
 // Start the App
 void setup(void)
 {
-    //Serial.begin(112500);
+    Serial.begin(112500);
+    delay(2);
+    Serial.println("Starting....");
     esp_task_wdt_deinit();
 
-    // GPIO for tesitng
+    // MBI_SRCLK used for testing
     esp_rom_gpio_pad_select_gpio(MBI_SRCLK); // scan row clock in?
     gpio_set_direction(MBI_SRCLK, GPIO_MODE_OUTPUT);         
-    gpio_set_level(MBI_SRCLK,   0); // to aid with debugging   
+    gpio_set_level(MBI_SRCLK, 0); // to aid with debugging   
+
 
     ESP_LOGD(TAG, "Allocation DMA Memory And Buffer"); 
 
@@ -552,17 +555,16 @@ void setup(void)
     spi_setup();
     spi_transfer_loop_start(); // start GCLK + Adress toggling
 
-
+    // MBI Step 1) Set key registers, such as number of rows
     mbi_soft_reset_dma(); // 10 clocks
     mbi_pre_active_dma(); // 14 clocks
-    
     mbi_send_config_reg1_dma();
 
-    
-
+    // MBI Step 2) Some other register 2 hack to reduce ghosting.
     mbi_pre_active_dma();
     mbi_send_config_reg2_dma();  
 
+    // MBI Step 3) Clean out any crap in the greyscale buffer
     mbi_soft_reset_dma();  // 10 clocks
     
 
@@ -571,6 +573,7 @@ void setup(void)
     for (int p = 0; p < 78; p++)
     {
       mbi_set_pixel(p,p, 255,255,255);
+      mbi_set_pixel((78-p),p, 255,255,255);
     }
 
     mbi_update_frame(true);    
@@ -590,16 +593,33 @@ void setup(void)
 
 }
 
-unsigned long last_count = 20000;
+//extern volatile int transfer_count;
+
+unsigned long last_count        = 20000;
+unsigned long last_reg_update   =  10000;
 unsigned long frames = 0;
 void loop() {
 
-    if ((millis() - last_count) > 1000)
-    {
-        //Serial.print("FPS: ");
-        //Serial.println(frames, DEC);
+    if ((millis() - last_count) > 1000) {
+        Serial.print("FPS: ");
+        Serial.println(frames, DEC);
         frames = 0;
         last_count = millis();
+
+        //Serial.print("Interrupt count: ");
+        //Serial.println(transfer_count, DEC);
+        
+    }
+
+    // Periodically reset reg1 update incase of corruption
+    // or the panel power being reset (and ESP32 still running)
+    if (  (millis() - last_reg_update)  > 10000   ) {
+    
+      mbi_pre_active_dma(); // 14 clocks 
+      mbi_send_config_reg1_dma();
+
+      last_reg_update = millis();
+
     }
 
     
@@ -637,20 +657,14 @@ void loop() {
        }
     
        draw_wireframe();
-
+    
         mbi_update_frame(true);    
         
-        //ESP_LOGD(TAG, "Sending greyscale data buffer out via LCD DMA.");
-        //dma_bus.send_stuff_once(dma_grey_gpio_data, counter2*sizeof(uint16_t), true); // sending payload hence TRUE 
-    
         spi_transfer_loop_stop();
         mbi_v_sync_dma();
         spi_transfer_loop_restart();  
-            frames++;     
+        frames++;     
 
      }    
-
-
-
 
  }
