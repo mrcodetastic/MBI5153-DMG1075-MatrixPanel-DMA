@@ -536,12 +536,14 @@ static IRAM_ATTR void dma_isr(void* param) {
   spi_ll_clear_intr(spi_device->host->hal.hw, SPI_LL_INTR_SEG_DONE); // clear segment done interrupt
  
 }
-
+*/  
 static IRAM_ATTR void dma_isr2(void* param) {
     gpio_set_level(MBI_SRCLK, 1); // to aid with debugging   
         gpio_set_level(MBI_SRCLK, 0); // to aid with debugging   
+
+        delay(3000);
 }
-*/  
+ 
 /**************************************************************************************************************************/
 // Linked List Stuff
 
@@ -768,6 +770,7 @@ esp_err_t spi_transfer_loop_start()
   trans.tx_buffer = start_tx; trans.length = (sizeof(start_tx)) * 8;
   trans.rx_buffer = NULL; trans.rxlength = 0;
 
+/*
   // Setup interrupt handler
   static intr_handle_t intr;
 
@@ -776,12 +779,11 @@ esp_err_t spi_transfer_loop_start()
 
   // TODO; Figure out a way to get interrupts working, and when the GCLK segement has completed and about to restert - then allow a DCLK / Greyscale transfer
   //       AT THE SAME TIME
-  //esp_intr_alloc_intrstatus(ETS_SPI2_INTR_SOURCE, ESP_INTR_FLAG_SHARED, (uint32_t)&GPSPI2.dma_int_st.val, SPI_DMA_SEG_TRANS_DONE_INT_ENA_M, dma_isr2,  NULL, &intr); 
+  esp_intr_alloc_intrstatus(ETS_SPI2_INTR_SOURCE, ESP_INTR_FLAG_SHARED, (uint32_t)&GPSPI2.dma_int_st.val, SPI_DMA_SEG_TRANS_DONE_INT_ENA_M, dma_isr2,  NULL, &intr); 
 
-  /*
-  esp_intr_alloc(ETS_SPI2_INTR_SOURCE, 0, dma_isr, NULL, &intr);
+  //esp_intr_alloc(ETS_SPI2_INTR_SOURCE, 0, dma_isr, NULL, &intr);
   esp_intr_enable(intr);
-  */
+*/  
 
   CHECK_CALLE(spi_device_polling_start_loop(spi_device, &trans, portMAX_DELAY), "Could not start SPI transfer");
 
