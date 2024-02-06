@@ -35,27 +35,17 @@ GCLK multiplier enabled (configuration register1 bit [6] = 1)
 #define pwm_hi                  65535  
 #define pwm_lo                  0 
 
+void mbi_clock (int clock);
+//void mbi_configuration(uint8_t ghost_elimination, uint8_t line_num, uint8_t gray_scale, uint8_t gclk_multiplier,uint8_t current);
+void mbi_configuration_1(); // reg1
+void mbi_configuration_2(); // reg2
 
-// Config for each 
-/*
-struct panel_cfg
-{
-    uint16_t mbi_blue[4];  // b1 to b4  //0..3
-    uint16_t mbi_green[4]; // g1 to r4  //0..3
-    uint16_t mbi_red[4];  // r1 to r4   //0..3
-    int scan_lines = 4;
-} panel_mbi_configs;
-*/
-void mbi_clock (uint8_t clock);
-void mbi_configuration(uint8_t ghost_elimination, uint8_t line_num, uint8_t gray_scale, uint8_t gclk_multiplier,uint8_t current);
-void mbi_configuration2();
 void mbi_send_config(uint16_t config, bool latch, bool reg2 = false);
 void mbi_pre_active ();
 void mbi_v_sync ();
 void mbi_soft_reset();
 
-void mbi_set_frame_test();
-void mbi_set_frame_lvgl_rgb(const uint8_t *rgb_data); //80 x 80 pixels
+void mbi_update_frame(); // send the buffer via gpio toggle
 
 
 /***************************************************************************************/
@@ -87,3 +77,41 @@ static const uint16_t DRAM_ATTR lumConvTab[] = {
     47014, 47549, 48088, 48630, 49177, 49728, 50283, 50842, 51406, 51973, 52545, 53120, 53700, 54284, 54873, 55465,
     56062, 56663, 57269, 57878, 58492, 59111, 59733, 60360, 60992, 61627, 62268, 62912, 63561, 64215, 64873, 65535};
 #endif
+
+
+/*
+  // MBI5152 Application Note V1.00- EN
+
+  Section 2: The Setting of Gray Scale 
+  The setting of gray scale data describes as below. 
+  1. The sequence of input data starts from scan line 1 scan line 2….  scan line M-1 scan line M 
+  (M≦16) 
+  2. The data sequence of cascaded IC is ICnICn-1…. IC2IC1. 
+  3. The data sequence of each channel is ch15ch14…. ch0. 
+  4. The data length of each channel is 16-bits, and the default PWM mode is 16-bits. The sequence of gray 
+  sacle is bit15bit14bit13…bit0 as figure 4 shows. The 14-bits gray scale can be set through Bit[7]=1 
+  in configuration register 1, and the sequence of gray scale data is bit13bit12… bit0 0 0, the 
+  last 2-bits (LSB) are set to “0”. 
+  5. The frequency of GCLK must be higher than 20% of DCLK to get the correct gray scale data. 
+  6. LE executes the data latch to send gray scale data into SRAM. Each 16xN bits data needs a “data latch 
+  command”, where N means the number of cascaded driver. 
+  7. After the last data latch, it needs at least 50 GCLKs to read the gray scale data into internal display buffer 
+  before the Vsync command comes. 
+  8. Display is updated immediately when MBI5152 receives the Vsync signal. 
+  9. GCLK must keep at low level more than 7ns before MBI5152 receives the Vsync signal. 
+  10. The period of dead time (ie. The 1025th GCLK) must be larger than 100ns.
+
+  The gray scale data needs the GCLK to save the data into SRAM. The frequency of GCLK must be higher 
+  than 20% of DCLK to get the correct data. 
+
+  // MBI5153
+  After the last data latch command, it needs at least 50 GCLKs to read the gray scale data into internal display 
+  buffer before the Vsync command comes. And display is updated immediately until MBI5051/52/53 receives 
+  the Vsync signal (high pulse of LE pin is sampled by 3-DCLK rising edges), as figure 6 shows.
+
+*/
+
+
+
+
+

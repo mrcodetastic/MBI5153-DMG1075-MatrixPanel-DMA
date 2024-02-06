@@ -1,4 +1,4 @@
-#include "esp32s3_peripheral.h"
+#include "mbi_gpio.h"
 #include "app_constants.hpp"
 
 static const char *TAG = "esp32s3_peripheral";
@@ -8,7 +8,7 @@ int         completed_trans = 0;
 
 void setup_gpio_dir()
 {
-    ESP_LOGD(TAG, "Setup GPIOs");       
+    ESP_LOGD(TAG, "Setup GPIOs Direction");       
 
     // GPIO Setup
     esp_rom_gpio_pad_select_gpio(ADDR_A_PIN);
@@ -102,6 +102,6 @@ void setup_gpio_output()
     gpio_set_level(MBI_R4,      0);              
 
     // Set some default values
-    gpio_set_level(MBI_SRCLK,   0);  
+    gpio_set_level(MBI_SRCLK,   0);  // if this is HIGH nothign will display
     gpio_set_level(MBI_SPARE,   0);      
 }

@@ -48,11 +48,6 @@
     return true;
   }  
 
-  lcd_cam_dev_t* getDev()
-  {
-    return &LCD_CAM;
-  }
-
 
   // ------------------------------------------------------------------------------
   void Bus_Parallel16::config(const config_t& cfg)
@@ -64,8 +59,7 @@
  //https://github.com/adafruit/Adafruit_Protomatter/blob/master/src/arch/esp32-s3.h
  bool Bus_Parallel16::init(void)
  {
-    _dev = getDev();
-
+ 
     // LCD_CAM peripheral isn't enabled by default -- MUST begin with this:
     periph_module_enable(PERIPH_LCD_CAM_MODULE);
     periph_module_reset(PERIPH_LCD_CAM_MODULE);
@@ -97,19 +91,14 @@
   
     auto  freq     = (_cfg.bus_freq);
 
-    // divider of 18 = 8.888mhz
-    // divider of 16 = 10mhz
-    //auto  _div_num = 20; // DO NOT CHANGE! // 8Mhz
-    auto  _div_num = 40; // DO NOT CHANGE! // 4Mhz
-
-    LCD_CAM.lcd_clock.lcd_clkm_div_num = _div_num;      
+    LCD_CAM.lcd_clock.lcd_clkm_div_num = 40; // 4 mhz
 
 
     ESP_LOGI("S3", "Clock divider is %d", (int)LCD_CAM.lcd_clock.lcd_clkm_div_num);
     ESP_LOGD("S3", "Resulting output clock frequency: %d Hz",  (int)(160000000L/LCD_CAM.lcd_clock.lcd_clkm_div_num)); 
 
-    LCD_CAM.lcd_clock.lcd_clkm_div_a = 1;     // 0/1 fractional divide
-    LCD_CAM.lcd_clock.lcd_clkm_div_b = 64;
+    LCD_CAM.lcd_clock.lcd_clkm_div_a = 0;     // 0/1 fractional divide
+    LCD_CAM.lcd_clock.lcd_clkm_div_b = 1;     // ractional clock divider numerator value
 
     LCD_CAM.lcd_ctrl.lcd_rgb_mode_en = 0;    // i8080 mode (not RGB)
     LCD_CAM.lcd_rgb_yuv.lcd_conv_bypass = 0; // Disable RGB/YUV converter
@@ -175,13 +164,14 @@
     };
     gdma_set_transfer_ability(dma_chan, &ability);    
 
+/*
     // Enable DMA transfer callback
     static gdma_tx_event_callbacks_t tx_cbs = {
        // .on_trans_eof is literally the only gdma tx event type available
       .on_trans_eof = gdma_on_trans_eof_callback 
     };
     gdma_register_tx_event_callbacks(dma_chan, &tx_cbs, NULL);
-
+*/
 
     // This uses a busy loop to wait for each DMA transfer to complete...
     // but the whole point of DMA is that one's code can do other work in
@@ -367,3 +357,6 @@
 
 
 #endif
+
+
+

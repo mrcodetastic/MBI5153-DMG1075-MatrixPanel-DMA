@@ -71,10 +71,7 @@
 // Internals specific to code and hardware. Do not change.
 // -------------------------------------------------------
 
-// DMA engine (if used)
-#define ESP32_I2S_DMA_STORAGE_TYPE uint8_t // DMA output of one uint16_t at a time.
-
-// For DMA GLCK and Address Line Data
+// For DMA GCLK and Address Line Data
 #define BIT_GCLK (1 << 0)
 #define BIT_A (1 << 1)
 #define BIT_B (1 << 2)
@@ -82,7 +79,33 @@
 #define BIT_D (1 << 4)
 #define BIT_E (1 << 5)
 
+// For Greyscale data
+
+// For DMA Greyscale and other data
+#define BIT_G1   (1 << 0)
+#define BIT_B1   (1 << 1)
+#define BIT_R1   (1 << 2)
+#define BIT_RGB1_CLR (0b111 << 0)
+#define BIT_G2   (1 << 3)
+#define BIT_B2   (1 << 4)
+#define BIT_R2   (1 << 5)
+#define BIT_RGB2_CLR (0b111 << 3)
+#define BIT_G3   (1 << 6)
+#define BIT_B3   (1 << 7)
+#define BIT_R3   (1 << 8)
+#define BIT_RGB3_CLR (0b111 << 6)
+#define BIT_G4   (1 << 9)
+#define BIT_B4   (1 << 10)
+#define BIT_R4   (1 << 11)
+#define BIT_RGB4_CLR (0b111 << 9)
+
+
+
+
 // RGB Panel Scan Lines
 #define PANEL_SCAN_LINES        20 // panel scan lines
+#define PANEL_MBI_RES_X         80 // How many pixels the MBI chips can support. Sure it's a 78 pixel panel, but 80 pixels are supported
 #define PANEL_MBI_LENGTH        5  // number of ic's changed for each subpixel
+#define PANEL_PHY_RES_X         78
+#define PANEL_PHY_RES_Y         78
 

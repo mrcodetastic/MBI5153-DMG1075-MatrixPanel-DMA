@@ -1,7 +1,8 @@
+// Send the address toggle and gclk data in a loop using dma
+
 // total byte size: 20520
 //--------------------------------------------
-
-const uint8_t dma_data_nodt[] = {
+const uint8_t gclk_addr_data_nodt[] = {
 0b11111111,
 0b11111110,
 0b11111111,
@@ -20522,4 +20523,3 @@ const uint8_t dma_data_nodt[] = {
 0b11111110,
 0b11111111,
 0b11111110};
-
