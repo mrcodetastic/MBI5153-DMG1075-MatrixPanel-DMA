@@ -10,6 +10,7 @@
 #include "app_constants.hpp"
 #include "lcd_dma_parallel16.hpp"
 #include "spi_dma_tx_loop.h"
+#include "Fastnoise.h"
 //#include <FastLED.h> // Fastled doesn't compileon S3, fuck it. No pattern plazma for me.
 //#include <Arduino.h>
 
@@ -80,6 +81,16 @@ Bus_Parallel16 dma_bus;
 DMA_ATTR ESP32_GREY_DMA_STORAGE_TYPE *dma_grey_gpio_data;
 size_t   dma_grey_buffer_size;
 
+FastNoiseLite noise;
+
+int simplexColorR = 0;
+int simplexColorG = 209;
+int simplexColorB = 255;
+
+int simplexBrightness = -33;
+float simplexContrast = 72;
+float simplexScale = 5;
+float simplexSpeed = 20;
 
 #ifndef _swap_int16_t
 #define _swap_int16_t(a, b)                                                    \
@@ -495,7 +506,7 @@ void draw_wireframe(void)
 // Start the App
 void setup(void)
 {
-    Serial.begin(112500);
+    Serial.begin(115200);
     delay(2);
     Serial.println("Starting....");
     esp_task_wdt_deinit();
@@ -587,9 +598,22 @@ void setup(void)
     mbi_v_sync_dma();
     spi_transfer_loop_restart();
 
+    
+    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
+    noise.SetRotationType3D(FastNoiseLite::RotationType3D_ImproveXYPlanes);
+    noise.SetFrequency(.0004);
+    //   noise.SetFractalType(FastNoiseLite::FractalType_FBm);
+    //   noise.SetFractalLacunarity(2.7);
+    //   noise.SetFractalOctaves(6);
+    //   noise.SetFractalGain(0.1);
+    //   noise.SetFractalLacunarity(2.7);
+    //   noise.SetFractalWeightedStrength(.1);
+    noise.SetDomainWarpType(FastNoiseLite::DomainWarpType_OpenSimplex2);
+    noise.SetDomainWarpAmp(240);
+
     delay(500);
  
-        
+    
 
 }
 
@@ -624,40 +648,55 @@ void loop() {
 
     
     //picture loop
-     for (int angle = 0; angle <= 360; angle = angle + 3) {
-    
-          for (int i = 0; i < 8; i++) {
+//     for (int angle = 0; angle <= 360; angle = angle + 3) {
+//    
+//          for (int i = 0; i < 8; i++) {
+//
+//         memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);    // accidenty display configuration registers id we don't clear th
+//    
+//        rot = angle * 0.0174532; //0.0174532 = one degree
+//    //rotateY
+//        rotz = cube_vertex[i][2] * cos(rot) - cube_vertex[i][0] * sin(rot);
+//        rotx = cube_vertex[i][2] * sin(rot) + cube_vertex[i][0] * cos(rot);
+//        roty = cube_vertex[i][1];
+//    //rotateX
+//        rotyy = roty * cos(rot) - rotz * sin(rot);
+//        rotzz = roty * sin(rot) + rotz * cos(rot);
+//        rotxx = rotx;
+//    //rotateZ
+//        rotxxx = rotxx * cos(rot) - rotyy * sin(rot);
+//        rotyyy = rotxx * sin(rot) + rotyy * cos(rot);
+//        rotzzz = rotzz;
+//    
+//    //orthographic projection
+//        rotxxx = rotxxx + originx;
+//        rotyyy = rotyyy + originy;
+//    
+//    //store new vertices values for wireframe drawing
+//        wireframe[i][0] = rotxxx;
+//        wireframe[i][1] = rotyyy;
+//        wireframe[i][2] = rotzzz;
+//    
+//        draw_vertices();
+//       }
+//    
+//       draw_wireframe();
+        
+        memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
 
-         memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);    // accidenty display configuration registers id we don't clear th
-    
-        rot = angle * 0.0174532; //0.0174532 = one degree
-    //rotateY
-        rotz = cube_vertex[i][2] * cos(rot) - cube_vertex[i][0] * sin(rot);
-        rotx = cube_vertex[i][2] * sin(rot) + cube_vertex[i][0] * cos(rot);
-        roty = cube_vertex[i][1];
-    //rotateX
-        rotyy = roty * cos(rot) - rotz * sin(rot);
-        rotzz = roty * sin(rot) + rotz * cos(rot);
-        rotxx = rotx;
-    //rotateZ
-        rotxxx = rotxx * cos(rot) - rotyy * sin(rot);
-        rotyyy = rotxx * sin(rot) + rotyy * cos(rot);
-        rotzzz = rotzz;
-    
-    //orthographic projection
-        rotxxx = rotxxx + originx;
-        rotyyy = rotyyy + originy;
-    
-    //store new vertices values for wireframe drawing
-        wireframe[i][0] = rotxxx;
-        wireframe[i][1] = rotyyy;
-        wireframe[i][2] = rotzzz;
-    
-        draw_vertices();
+        for (int i = 0; i < 80; i++) {
+         for (int j = 0; j < 80; j++) {
+           int col = int((1 + noise.GetNoise(j * simplexScale * 10, i * simplexScale * 10, float(millis() * simplexSpeed / 50))) * 127);
+           col += simplexBrightness;
+           col = constrain(col, 0, 255);
+           float contrastFactor = (259 * (simplexContrast + 255)) / (255 * (259 - simplexContrast));
+           col = contrastFactor * (col - 128) + 128;
+           col = constrain(col, 0, 255);
+
+            mbi_set_pixel(j, i, uint8_t(col * simplexColorR / 255.0f),uint8_t(col * simplexColorG / 255.0f),uint8_t(col * simplexColorB / 255.0f));
+         }
        }
-    
-       draw_wireframe();
-    
+        
         mbi_update_frame(true);    
         
         spi_transfer_loop_stop();
@@ -665,6 +704,5 @@ void loop() {
         spi_transfer_loop_restart();  
         frames++;     
 
-     }    
 
  }
