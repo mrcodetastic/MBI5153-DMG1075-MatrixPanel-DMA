@@ -623,7 +623,7 @@ unsigned long last_count        = 20000;
 unsigned long last_reg_update   =  10000;
 unsigned long frames = 0;
 void loop() {
-
+/*
     if ((millis() - last_count) > 1000) {
         Serial.print("FPS: ");
         Serial.println(frames, DEC);
@@ -634,7 +634,7 @@ void loop() {
         //Serial.println(transfer_count, DEC);
         
     }
-
+*/
     // Periodically reset reg1 update incase of corruption
     // or the panel power being reset (and ESP32 still running)
     if (  (millis() - last_reg_update)  > 10000   ) {

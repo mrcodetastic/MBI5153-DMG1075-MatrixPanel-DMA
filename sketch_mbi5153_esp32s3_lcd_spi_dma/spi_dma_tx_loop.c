@@ -735,7 +735,8 @@ esp_err_t spi_setup(void)
 
   // Set the GCLK Frequency
   // Note: The frequency of GCLK must be higher than 20% of DCLK to get the correct gray scale data.  
-  device_conf.clock_speed_hz  = SPI_MASTER_FREQ_8M/2; // 4Mhz
+  //device_conf.clock_speed_hz  = SPI_MASTER_FREQ_8M/2; // 4Mhz
+  device_conf.clock_speed_hz  = 8 * 1000 * 1000; // 3Mhz
   
   device_conf.duty_cycle_pos  = 0;
   device_conf.cs_ena_pretrans = device_conf.cs_ena_posttrans = 0;
@@ -803,7 +804,9 @@ esp_err_t spi_transfer_loop_restart(void) {
 
   //gdma_ll_rx_reset_channel(&GDMA, bus_attr->tx_dma_chan); // Warning: This resets all registers as well!
 
-  dma_data_lldesc[dma_lldesc_required-1].eof = 1;
+  ///vTaskDelay(pdMS_TO_TICKS(2));
+
+  dma_data_lldesc[dma_lldesc_required-1].eof = 0;
   dma_data_lldesc[dma_lldesc_required-1].qe.stqe_next = &dma_data_lldesc[0];  
 
   gdma_ll_tx_start(&GDMA, bus_attr->tx_dma_chan);
@@ -825,8 +828,13 @@ esp_err_t spi_transfer_loop_stop(void) {
   dma_data_lldesc[dma_lldesc_required-1].eof = 1;
   dma_data_lldesc[dma_lldesc_required-1].qe.stqe_next = NULL;
 
-  
-  delay(8); // SUPER IMPORTANT need a delay here or we vsync bfore the addres stuff has stopped! Need to figure out a smarter way to do this.
+
+  for (int i=0; i < 90000; i++) // Found Through Trial and error and Pulse View, lower = likely to break the output.... LAT occurs before data is all sent
+        __asm__ __volatile__ ("nop");
+
+//  vTaskDelay(3); // this works ok as well.
+
+  //delay(8); // SUPER IMPORTANT need a delay here or we vsync bfore the addres stuff has stopped! Need to figure out a smarter way to do this.
              // Setting this value lower WILL likely cause issues.
 
   return ESP_OK;

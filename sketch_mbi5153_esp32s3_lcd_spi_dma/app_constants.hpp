@@ -9,12 +9,12 @@
 
 #define GPIO_MAPPING_DEFAULT     1
 #define GPIO_MAPPING_PCB_DEVS3   2
-#define GPIO_MAPPING_PCB_DHRUV   3 
 
 // Selected mode
-#define GPIO_MAPPING GPIO_MAPPING_PCB_DEVS3
+#define GPIO_MAPPING GPIO_MAPPING_DEFAULT
 
 
+// GPIo48 is the on board RGB LED 
 #if (GPIO_MAPPING == GPIO_MAPPING_DEFAULT)
 
   #define ADDR_A_PIN              GPIO_NUM_5
@@ -35,8 +35,8 @@
 
   // Second 1/4 of panel -> 20 rows
   #define MBI_G2                  GPIO_NUM_39    
-  #define MBI_B2                  GPIO_NUM_17  
-  #define MBI_R2                  GPIO_NUM_18  
+  #define MBI_B2                  GPIO_NUM_18  
+  #define MBI_R2                  GPIO_NUM_17  
 
   // Third 1/4 of panel -> 20 rows
   #define MBI_G3                  GPIO_NUM_8  
@@ -80,9 +80,6 @@
   #define MBI_G4                  GPIO_NUM_21    
   #define MBI_B4                  GPIO_NUM_9  
   #define MBI_R4                  GPIO_NUM_46  
-
-#elif (GPIO_MAPPING == GPIO_MAPPING_PCB_DHRUV)  
-
 
 #endif
 
