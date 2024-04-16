@@ -515,8 +515,9 @@ void setup(void)
     Serial.println("Starting....");
     esp_task_wdt_deinit();
 
-//    connectWiFi();
-//    e131.begin();
+    connectWiFi();
+//
+    e131.begin();
     
     // MBI_SRCLK used for testing
     esp_rom_gpio_pad_select_gpio(MBI_SRCLK); // scan row clock in?
@@ -695,46 +696,46 @@ void loop() {
 
 
 // -------Fastnoise---------//
-          memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
-
-        for (int i = 0; i < 80; i++) {
-         for (int j = 0; j < 80; j++) {
-           int col = int((1 + noise.GetNoise(j * simplexScale * 10, i * simplexScale * 10, float(millis() * simplexSpeed / 50))) * 127);
-           col += simplexBrightness;
-           col = constrain(col, 0, 255);
-           float contrastFactor = (259 * (simplexContrast + 255)) / (255 * (259 - simplexContrast));
-           col = contrastFactor * (col - 128) + 128;
-           col = constrain(col, 0, 255);
-
-            mbi_set_pixel(j, i, uint8_t(col * simplexColorR / 255.0f),uint8_t(col * simplexColorG / 255.0f),uint8_t(col * simplexColorB / 255.0f));
-         }
-       }
-        
-        mbi_update_frame(true);    
-        
-        spi_transfer_loop_stop();
-        mbi_v_sync_dma();
-        spi_transfer_loop_restart();  
-        frames++;     
+//          memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
+//
+//        for (int i = 0; i < 80; i++) {
+//         for (int j = 0; j < 80; j++) {
+//           int col = int((1 + noise.GetNoise(j * simplexScale * 10, i * simplexScale * 10, float(millis() * simplexSpeed / 50))) * 127);
+//           col += simplexBrightness;
+//           col = constrain(col, 0, 255);
+//           float contrastFactor = (259 * (simplexContrast + 255)) / (255 * (259 - simplexContrast));
+//           col = contrastFactor * (col - 128) + 128;
+//           col = constrain(col, 0, 255);
+//
+//            mbi_set_pixel(j, i, uint8_t(col * simplexColorR / 255.0f),uint8_t(col * simplexColorG / 255.0f),uint8_t(col * simplexColorB / 255.0f));
+//         }
+//       }
+//        
+//        mbi_update_frame(true);    
+//        
+//        spi_transfer_loop_stop();
+//        mbi_v_sync_dma();
+//        spi_transfer_loop_restart();  
+//        frames++;     
 // -------end---------//
 
 
 
 // -------e131---------//
-//          memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
-//        
-//        for (int i = 0; i < 80; i++) {
-//         for (int j = 0; j < 80; j++) {
-//            uint8_t col = wsRawData[(i*80+j)];
-//            mbi_set_pixel(j, i, col, col, col);
-//         }
-//       }
-//          
-//          mbi_update_frame(true);    
-//          spi_transfer_loop_stop();
-//          mbi_v_sync_dma();
-//          spi_transfer_loop_restart();  
-//          frames++;
+          memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
+        
+        for (int i = 0; i < 80; i++) {
+         for (int j = 0; j < 80; j++) {
+            uint8_t col = wsRawData[(i*80+j)];
+            mbi_set_pixel(j, i, col, col, col);
+         }
+       }
+          
+          mbi_update_frame(true);    
+          spi_transfer_loop_stop();
+          mbi_v_sync_dma();
+          spi_transfer_loop_restart();  
+          frames++;
 
 // ---------end--------//
 
