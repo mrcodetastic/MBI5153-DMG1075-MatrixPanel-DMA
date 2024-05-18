@@ -2,7 +2,7 @@
 #include <ESPAsyncE131.h>
 
 
-uint8_t wsRawData[80 * 80];
+uint8_t wsRawData[78 * 78];
 class E131 {
 private:
     // With 512 channels per universe, you need 24 universes to send all the data
