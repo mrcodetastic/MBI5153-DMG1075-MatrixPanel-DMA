@@ -8,13 +8,13 @@
 #include "Fastnoise.h"
 #include "app_constants.hpp"
 #include "driver/gpio.h"
-#include "e131.h"
+// #include "e131.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lcd_dma_parallel16.hpp"
 #include "sdkconfig.h"
 #include "spi_dma_tx_loop.h"
-#include "wificonnect.h"
+// #include "wificonnect.h"
 
 // #include <FastLED.h> // Fastled doesn't compileon S3, fuck it. No pattern plazma for me.
 // #include <Arduino.h>
@@ -86,7 +86,7 @@ DMA_ATTR ESP32_GREY_DMA_STORAGE_TYPE *dma_grey_gpio_data;
 size_t dma_grey_buffer_size;
 
 FastNoiseLite noise;
-E131 e131;
+// E131 e131;
 
 int simplexColorR = 0;
 int simplexColorG = 209;
@@ -96,6 +96,12 @@ int simplexBrightness = -33;
 float simplexContrast = 72;
 float simplexScale = 5;
 float simplexSpeed = 20;
+
+TaskHandle_t updateMatrixTaskHandle;
+TaskHandle_t updateNoiseTaskHandle;
+TaskHandle_t updateRegisterTaskHandle;
+
+SemaphoreHandle_t matrixUpdatedSemaphore;
 
 #ifndef _swap_int16_t
 #define _swap_int16_t(a, b) \
@@ -480,27 +486,95 @@ void draw_wireframe(void) {
 
 /********************************************************************/
 
-bool triggerUpdate = false;
+/********************************************************************/
 
-// Define a function to encapsulate the code block
-void updateFrameTask(void *parameter) {
-  while (true) {
-    if (triggerUpdate) {
-      mbi_update_frame(true);
-      spi_transfer_loop_stop();
-      mbi_v_sync_dma();
-      spi_transfer_loop_restart();
-      triggerUpdate = false;  // Reset the trigger
+void updateNoise() {
+  // -------Fastnoise---------//
+  memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
+
+  for (int i = 0; i < 80; i++) {
+    for (int j = 0; j < 80; j++) {
+      int col = int((1 + noise.GetNoise(j * simplexScale * 10, i * simplexScale * 10, float(millis() * simplexSpeed / 50))) * 127);
+      col += simplexBrightness;
+      col = constrain(col, 0, 255);
+      float contrastFactor = (259 * (simplexContrast + 255)) / (255 * (259 - simplexContrast));
+      col = contrastFactor * (col - 128) + 128;
+      col = constrain(col, 0, 255);
+
+      mbi_set_pixel(j, i, uint8_t(col * simplexColorR / 255.0f), uint8_t(col * simplexColorG / 255.0f), uint8_t(col * simplexColorB / 255.0f));
     }
-    vTaskDelay(1);  // Adjust delay as needed
   }
 }
 
-/********************************************************************/
+void updateMatrix() {
+  mbi_update_frame(true);
+  mbi_v_sync_dma();
+  spi_transfer_loop_restart();
+}
+
+void updateRegister() {
+  spi_transfer_loop_stop();
+  mbi_pre_active_dma();  // 14 clocks
+  mbi_send_config_reg1_dma();
+}
+
+void testing() {
+  log_w("Hey");
+}
+
+void testingTask(void *parameter) {
+  const TickType_t xFrequency = pdMS_TO_TICKS(30); // 2000 ms interval (2 seconds)
+  TickType_t xLastWakeTime = xTaskGetTickCount(); // Get the current tick count
+
+  for (;;) {
+    updateNoise(); // Call the testing function
+    updateMatrix();
+    // vTaskDelayUntil(&xLastWakeTime, xFrequency); // Delay until the next 2 seconds
+  }
+}
+
+void updateNoiseTask(void *parameter) {
+  for (;;) {
+    UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark(NULL);
+    log_d("updateNoise %d", uxHighWaterMark);
+    xSemaphoreTake(matrixUpdatedSemaphore, portMAX_DELAY); // Wait for updateMatrix to complete
+    
+    updateNoise();
+  }
+}
+
+void updateMatrixTask(void *parameter) {
+  const TickType_t xFrequency = pdMS_TO_TICKS(30); // 30 ms interval
+  TickType_t xLastWakeTime = xTaskGetTickCount(); // Get the current tick count
+
+  for (;;) {
+    // Wait for the next cycle.
+    UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark(NULL);
+    log_d("updateMatrix: %d", uxHighWaterMark);
+    updateMatrix();
+    vTaskDelay(pdMS_TO_TICKS(10)); // Adjust the delay time as needed
+    xSemaphoreGive(matrixUpdatedSemaphore); // Signal that updateMatrix is done
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  }
+}
+
+void updateRegisterTask(void *parameter) {
+  const TickType_t xFrequency = pdMS_TO_TICKS(10000); // 30 ms interval
+  TickType_t xLastWakeTime = xTaskGetTickCount(); // Get the current tick count
+
+  for (;;) {
+    // Wait for the next cycle.
+    UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark(NULL);
+    log_d("updateRegister: %d", uxHighWaterMark);
+    updateRegister();
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  }
+}
+
 
 // Start the App
 void setup(void) {
-  Serial.begin(115200);
+  // Serial.begin(115200);
   delay(2);
   Serial.println("Starting....");
   Serial.print("setup() running on core ");
@@ -603,7 +677,7 @@ void setup(void) {
   // );
 
   noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
-  noise.SetRotationType3D(FastNoiseLite::RotationType3D_ImproveXYPlanes);
+  // noise.SetRotationType3D(FastNoiseLite::RotationType3D_ImproveXYPlanes);
   noise.SetFrequency(.0004);
   //   noise.SetFractalType(FastNoiseLite::FractalType_FBm);
   //   noise.SetFractalLacunarity(2.7);
@@ -611,10 +685,48 @@ void setup(void) {
   //   noise.SetFractalGain(0.1);
   //   noise.SetFractalLacunarity(2.7);
   //   noise.SetFractalWeightedStrength(.1);
-  noise.SetDomainWarpType(FastNoiseLite::DomainWarpType_OpenSimplex2);
-  noise.SetDomainWarpAmp(240);
+  // noise.SetDomainWarpType(FastNoiseLite::DomainWarpType_OpenSimplex2);
+  // noise.SetDomainWarpAmp(240);
 
-  delay(500);
+  matrixUpdatedSemaphore = xSemaphoreCreateBinary();
+
+  // xTaskCreate(
+  //   updateRegisterTask,          // Task function
+  //   "Update Register Task",      // Name of the task
+  //   2048,                     // Stack size in words
+  //   NULL,                     // Task input parameter
+  //   2,                        // Priority of the task
+  //   NULL                      // Task handle
+  // );
+
+  // xTaskCreate(
+  //   updateMatrixTask,       // Task function
+  //   "Update Matrix Task",   // Name of the task
+  //   4096,                     // Stack size in words
+  //   NULL,                     // Task input parameter
+  //   1,                        // Priority of the task
+  //   NULL                      // Task handle
+  // );
+
+  // xTaskCreate(
+  //   updateNoiseTask,          // Task function
+  //   "Update Noise Task",      // Name of the task
+  //   2048,                     // Stack size in words
+  //   NULL,                     // Task input parameter
+  //   2,                        // Priority of the task
+  //   NULL                      // Task handle
+  // );
+
+  xTaskCreate(
+    testingTask,          // Task function
+    "Testing Task",      // Name of the task
+    8192,                     // Stack size in words
+    NULL,                     // Task input parameter
+    1,                        // Priority of the task
+    NULL                      // Task handle
+  );
+
+  // delay(500);
 }
 
 // extern volatile int transfer_count;
@@ -622,6 +734,7 @@ void setup(void) {
 unsigned long last_count = 20000;
 unsigned long last_reg_update = 10000;
 unsigned long frames = 0;
+
 void loop() {
   // Serial.print("loop() running on core ");
   // Serial.println(xPortGetCoreID());
@@ -639,12 +752,12 @@ void loop() {
   */
   // Periodically reset reg1 update incase of corruption
   // or the panel power being reset (and ESP32 still running)
-  if ((millis() - last_reg_update) > 10000) {
-    mbi_pre_active_dma();  // 14 clocks
-    mbi_send_config_reg1_dma();
+  // if ((millis() - last_reg_update) > 10000) {
+  //   mbi_pre_active_dma();  // 14 clocks
+  //   mbi_send_config_reg1_dma();
 
-    last_reg_update = millis();
-  }
+  //   last_reg_update = millis();
+  // }
 
   // -------Cube---------//
   // picture loop
@@ -686,29 +799,27 @@ void loop() {
   // -------end---------//
 
   // -------Fastnoise---------//
-  memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
+  // memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
 
-  for (int i = 0; i < 80; i++) {
-    for (int j = 0; j < 80; j++) {
-      int col = int((1 + noise.GetNoise(j * simplexScale * 10, i * simplexScale * 10, float(millis() * simplexSpeed / 50))) * 127);
-      col += simplexBrightness;
-      col = constrain(col, 0, 255);
-      float contrastFactor = (259 * (simplexContrast + 255)) / (255 * (259 - simplexContrast));
-      col = contrastFactor * (col - 128) + 128;
-      col = constrain(col, 0, 255);
+  // for (int i = 0; i < 80; i++) {
+  //   for (int j = 0; j < 80; j++) {
+  //     int col = int((1 + noise.GetNoise(j * simplexScale * 10, i * simplexScale * 10, float(millis() * simplexSpeed / 50))) * 127);
+  //     col += simplexBrightness;
+  //     col = constrain(col, 0, 255);
+  //     float contrastFactor = (259 * (simplexContrast + 255)) / (255 * (259 - simplexContrast));
+  //     col = contrastFactor * (col - 128) + 128;
+  //     col = constrain(col, 0, 255);
 
-      mbi_set_pixel(j, i, uint8_t(col * simplexColorR / 255.0f), uint8_t(col * simplexColorG / 255.0f), uint8_t(col * simplexColorB / 255.0f));
-    }
-  }
-  // triggerUpdate = true;
+  //     mbi_set_pixel(j, i, uint8_t(col * simplexColorR / 255.0f), uint8_t(col * simplexColorG / 255.0f), uint8_t(col * simplexColorB / 255.0f));
+  //   }
+  // }
 
-  mbi_update_frame(true);
+  // mbi_update_frame(true);
 
-  spi_transfer_loop_stop();
-  mbi_v_sync_dma();
-  spi_transfer_loop_restart();
+  // spi_transfer_loop_stop();
+  // mbi_v_sync_dma();
+  // spi_transfer_loop_restart();
 
-  //  frames++;
   // -------end---------//
 
   // -------e131---------//
