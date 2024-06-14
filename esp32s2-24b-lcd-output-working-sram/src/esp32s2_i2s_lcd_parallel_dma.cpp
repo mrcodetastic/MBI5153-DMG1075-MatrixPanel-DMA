@@ -64,6 +64,20 @@
     }
   }
 
+  /**
+   * Get the number of descriptors required for a given buffer size.
+   *
+   * @param data_size Size to check descriptor num.
+   *
+   * @return Numbers required.
+   */
+  // from esp32s2\include\soc\include\soc\lldesc.h
+  inline int lldesc_get_required_num_constrained(int data_size, int max_desc_size)
+  {
+      return (data_size + max_desc_size - 1) / max_desc_size;
+  }
+    
+
 
   static lldesc_t * allocate_dma_descriptors_gb(uint32_t count, uint16_t payload_size, DMA_DATA_TYPE *buffer)
   {
