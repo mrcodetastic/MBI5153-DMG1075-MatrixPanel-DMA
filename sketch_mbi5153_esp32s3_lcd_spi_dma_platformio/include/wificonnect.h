@@ -4,21 +4,19 @@
  */
 
 #include <WiFi.h>
-#include <WiFiMulti.h>
-
-WiFiMulti WiFiMulti;
 
 void connectWiFi()
 {
 
     // We start by connecting to a WiFi network
-    WiFiMulti.addAP("Tardigrade2", "chocolate-Milk2@");
+    // WiFi.begin("Tardigrade2", "chocolate-Milk2@");
+    WiFi.begin("Pixel_9363", "yellow22");
 
     Serial.println();
     Serial.println();
     Serial.print("Waiting for WiFi... ");
 
-    while(WiFiMulti.run() != WL_CONNECTED) {
+    while(WiFi.status() != WL_CONNECTED) {
         Serial.print(".");
         delay(500);
     }

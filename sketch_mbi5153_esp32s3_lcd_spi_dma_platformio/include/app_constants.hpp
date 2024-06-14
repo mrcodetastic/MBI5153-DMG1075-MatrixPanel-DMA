@@ -146,3 +146,31 @@
 
 #define PANEL_MBI_RES_X 80
 #define PANEL_MBI_RES_Y 80
+
+#define ghost_elimination_ON 0b11  // послесвечение выключенно
+#define ghost_elimination_OFF 0    // послесвечение включено
+#define gray_scale_13 1            // шкала серого 13 бит
+#define gray_scale_14 0            // шкала серого 14 бит
+
+/* GCLK multiplier
+MBI5153 provides a GCLK multiplier function by setting the configuration register1 bit [6]. The default value is set
+to ’0’ for GCLK multiplier disable = 513 required for each row.
+
+GCLK multiplier enabled (configuration register1 bit [6] = 1)
+= 257 gclocks for each row!
+*/
+
+#define gclk_multiplier_ON 1   // GCLK Multipler On - You MUST use exactly 257 clocks for each rowscan!
+#define gclk_multiplier_OFF 0  // GCLK Multipler On - You MUST use exactly 513 clocks for each rowscan!
+#define current_1 15           // ток на светодиоде
+#define current_2 63           // ток на светодиоде
+#define current_3 35           // ток на светодиоде
+#define current_4 20           // LED current
+
+#define clock_delay 0
+#define pwm_hi 65535
+#define pwm_lo 0
+
+#define PHYSICS_SCALE 100
+
+#define OFFSET 0
