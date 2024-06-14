@@ -11,7 +11,7 @@
 #define GPIO_MAPPING_PCB_DEVS3   2
 
 // Selected mode
-#define GPIO_MAPPING GPIO_MAPPING_PCB_DEVS3
+#define GPIO_MAPPING GPIO_MAPPING_DEFAULT
 
 
 // GPIo48 is the on board RGB LED 

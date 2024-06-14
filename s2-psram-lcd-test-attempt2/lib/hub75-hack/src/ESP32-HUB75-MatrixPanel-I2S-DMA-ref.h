@@ -86,6 +86,8 @@ GCLK multiplier enabled (configuration register1 bit [6] = 1)
 = 257 gclocks for each row!
 */
 
+//25600
+// 10260 
 #define gclk_multiplier_ON_clks  257   // GCLK Multipler On - You MUST use exactly 257 clocks for each rowscan!
 #define gclk_multiplier_OFF_clks 513  // GCLK Multipler Off - You MUST use exactly 513 clocks for each rowscan!
 
