@@ -18,6 +18,7 @@ extern "C"
 {
 #endif
 
+extern volatile int transfer_count;
 
 extern esp_err_t spi_setup(void);
 extern esp_err_t spi_transfer_loop_start(void);

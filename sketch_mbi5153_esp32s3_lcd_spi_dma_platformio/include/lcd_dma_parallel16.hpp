@@ -133,6 +133,8 @@
 
     esp_err_t dma_transfer_start();
     esp_err_t send_stuff_once(void *data, size_t size_in_bytes, bool is_greyscale_data = false);
+
+    int get_transfer_count();
     //void dma_transfer_restart();    
     //void dma_transfer_pause();        
     //void dma_transfer_stop();

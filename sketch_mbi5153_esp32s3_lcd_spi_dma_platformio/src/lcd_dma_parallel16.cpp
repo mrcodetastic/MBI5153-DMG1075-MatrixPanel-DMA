@@ -50,10 +50,34 @@ IRAM_ATTR bool gdma_on_trans_eof_callback(gdma_channel_handle_t dma_chan,
   return true;
 }
 
+
+
+volatile bool buffer_sent = false;
+volatile int trans_done_count = 0;
+
+static void IRAM_ATTR lcd_isr(void* arg) {
+
+  // From original Sprite_TM Code
+  //REG_WRITE(I2S_INT_CLR_REG(1), (REG_READ(I2S_INT_RAW_REG(1)) & 0xffffffc0) | 0x3f);
+  
+  // Clear flag so we can get retriggered
+ // SET_PERI_REG_BITS(I2S_INT_CLR_REG(ESP32_I2S_DEVICE), I2S_OUT_EOF_INT_CLR_V, 1, I2S_OUT_EOF_INT_CLR_S);      
+  LCD_CAM.lc_dma_int_clr.lcd_trans_done_int_clr = 1;                
+  
+  // at this point, the previously active buffer is free, go ahead and write to it
+  buffer_sent = true;
+  trans_done_count++;
+
+}
+
+
 lcd_cam_dev_t *getDev() {
   return &LCD_CAM;
 }
 
+int Bus_Parallel16::get_transfer_count() {
+  return trans_done_count;
+}
 
 // ------------------------------------------------------------------------------
 void Bus_Parallel16::config(const config_t &cfg) {
@@ -115,7 +139,7 @@ esp_err_t Bus_Parallel16::setup_lcd_dma_periph(void) {
   // Don't change these unless you know what you are doing, and you probably don't!
   //LCD_CAM.lcd_clock.lcd_clkm_div_num = 22;  // 7mhz  // Anything > 8Mhz seems to introduce noise when using jumper
   //LCD_CAM.lcd_clock.lcd_clkm_div_num = 80;  // 2mhz
-  LCD_CAM.lcd_clock.lcd_clkm_div_num = 18;  // 7mhz  // Anything > 8Mhz seems to introduce noise when using jumper
+  LCD_CAM.lcd_clock.lcd_clkm_div_num = 22;  // 7mhz  // Anything > 8Mhz seems to introduce noise when using jumper
 
   LCD_CAM.lcd_clock.lcd_clkm_div_b = 0;  // fractal clock divider numerator
   LCD_CAM.lcd_clock.lcd_clkm_div_a = 1;  // denominator
@@ -202,8 +226,7 @@ esp_err_t Bus_Parallel16::setup_lcd_dma_periph(void) {
   // This uses a busy loop to wait for each DMA transfer to complete...
   // but the whole point of DMA is that one's code can do other work in
   // the interim. The CPU is totally free while the transfer runs!
-  while (LCD_CAM.lcd_user.lcd_start)
-    ;  // Wait for DMA completion callback
+  //while (LCD_CAM.lcd_user.lcd_start);  // Wait for DMA completion callback
 
   // After much experimentation, each of these steps is required to get
   // a clean start on the next LCD transfer:
@@ -213,6 +236,13 @@ esp_err_t Bus_Parallel16::setup_lcd_dma_periph(void) {
   LCD_CAM.lcd_user.lcd_dout = 1;         // Enable data out
   LCD_CAM.lcd_user.lcd_update = 1;       // Update registers
   LCD_CAM.lcd_misc.lcd_afifo_reset = 1;  // Reset LCD TX FIFO
+
+  //
+  // Enable Transaction Done interrupt, useful for us when we send stuff once
+  LCD_CAM.lc_dma_int_ena.lcd_trans_done_int_ena = 1;
+
+  // Allocate a level 1 intterupt: lowest priority, as ISR isn't urgent and may take a long time to complete
+  esp_intr_alloc(ETS_LCD_CAM_INTR_SOURCE, (int)(ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_LEVEL1), lcd_isr, NULL, NULL);
 
   //return true; // no return val = illegal instruction
   assert(ret == ESP_OK);
@@ -261,10 +291,13 @@ bool Bus_Parallel16::allocate_dma_desc_memory(size_t len) {
 esp_err_t Bus_Parallel16::dma_transfer_start() {
   esp_err_t ret = gdma_start(dma_chan, (intptr_t)&_dmadesc_a[0]);  // Start DMA w/updated descriptor(s)
   esp_rom_delay_us(10);                                            // Must 'bake' a moment before...
-  LCD_CAM.lcd_user.lcd_start = 1;                                  // Trigger LCD DMA transfer
 
-  while (LCD_CAM.lcd_user.lcd_start)
-    ;
+  buffer_sent = false;
+  LCD_CAM.lcd_user.lcd_start = 1;                                  // Trigger LCD DMA transfer
+  while (LCD_CAM.lcd_user.lcd_start);
+
+  // WAIT UNTIL SENT!
+  while (buffer_sent == false); 
 
   return ret;
 
@@ -274,7 +307,7 @@ esp_err_t Bus_Parallel16::dma_transfer_start() {
 
 esp_err_t Bus_Parallel16::send_stuff_once(void *data, size_t size_in_bytes, bool is_greyscale_data) {
 
-  ESP_LOGI(TAG, "Sending DMA payload of length %d bytes.", size_in_bytes);
+  ESP_LOGV(TAG, "Sending DMA payload of length %d bytes.", size_in_bytes);
 
   // Small optimisation
   // If a previous call to this function was to send greyscale data, then we assume all the
@@ -292,7 +325,7 @@ esp_err_t Bus_Parallel16::send_stuff_once(void *data, size_t size_in_bytes, bool
   int len = size_in_bytes;
 
   int dma_lldesc_required = lldesc_get_required_num(size_in_bytes);
-  ESP_LOGI(TAG, "Number of DMA descriptors required for LCD payload is: %d.", dma_lldesc_required);
+  ESP_LOGV(TAG, "Number of DMA descriptors required for LCD payload is: %d.", dma_lldesc_required);
 
   // Allocate descriptor block of memory if it hasn't already been allocated
   allocate_dma_desc_memory(dma_lldesc_required);
@@ -314,11 +347,11 @@ esp_err_t Bus_Parallel16::send_stuff_once(void *data, size_t size_in_bytes, bool
     len -= dmachunklen;
     data += dmachunklen;
 
-    ESP_LOGD(TAG, "Configured _dmadesc_a at pos %d, memory location %08x, pointing to data of size %d. Next dma desc is %d.", n, (uintptr_t)&_dmadesc_a[n], (int)_dmadesc_a[n].dw0.size, n + 1);
+    ESP_LOGV(TAG, "Configured _dmadesc_a at pos %d, memory location %08x, pointing to data of size %d. Next dma desc is %d.", n, (uintptr_t)&_dmadesc_a[n], (int)_dmadesc_a[n].dw0.size, n + 1);
     n++;
   }
 
-  ESP_LOGD(TAG, "Configured _dmadesc_a at pos %d, to have EOF flag = 1.", n - 1);
+  ESP_LOGV(TAG, "Configured _dmadesc_a at pos %d, to have EOF flag = 1.", n - 1);
 
   // All done, no looping here this time!
   _dmadesc_a[n - 1].dw0.suc_eof = 1;  //Mark last DMA desc as end of stream.

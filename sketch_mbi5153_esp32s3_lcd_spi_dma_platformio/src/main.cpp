@@ -125,7 +125,8 @@ void testingTask(void *parameter) {
   
   static unsigned long lastTime = 0;
   unsigned long currentTime = millis();
-  ESP_LOGE(TAG, "Time since last loop: %lu ms", currentTime - lastTime);
+
+  //ESP_LOGE(TAG, "Time since last loop: %lu ms", currentTime - lastTime);
   lastTime = currentTime;
 
   }
@@ -165,7 +166,7 @@ void updateRegisterTask(void *parameter) {
     // Wait for the next cycle.
     UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark(NULL);
     ESP_LOGD(TAG, "updateRegister: %d", uxHighWaterMark);
-    matrix.updateRegister();
+    matrix.updateRegisters();
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
@@ -191,132 +192,12 @@ void setup(void) {
   noise.SetFrequency(simplexFrequency);
   matrixUpdatedSemaphore = xSemaphoreCreateBinary();
 
-  // xTaskCreate(
-  //   updateRegisterTask,          // Task function
-  //   "Update Register Task",      // Name of the task
-  //   2048,                     // Stack size in words
-  //   NULL,                     // Task input parameter
-  //   2,                        // Priority of the task
-  //   NULL                      // Task handle
-  // );
-
-  // xTaskCreate(
-  //   updateMatrixTask,       // Task function
-  //   "Update Matrix Task",   // Name of the task
-  //   4096,                     // Stack size in words
-  //   NULL,                     // Task input parameter
-  //   1,                        // Priority of the task
-  //   NULL                      // Task handle
-  // );
-
-  // xTaskCreate(
-  //   updateNoiseTask,          // Task function
-  //   "Update Noise Task",      // Name of the task
-  //   4096,                     // Stack size in words
-  //   NULL,                     // Task input parameter
-  //   1,                        // Priority of the task
-  //   NULL                      // Task handle
-  // );
-
-  // xTaskCreate(
-  //   testingTask,          // Task function
-  //   "Testing Task",      // Name of the task
-  //   8192,                     // Stack size in words
-  //   NULL,                     // Task input parameter
-  //   1,                        // Priority of the task
-  //   NULL                      // Task handle
-  // );
-
-    // setup_periodic_timer();
-  // delay(500);
 }
 
 
 extern volatile int transfer_count;
 
 void loop() {
-  // Serial.print("loop() running on core ");
-  // Serial.println(xPortGetCoreID());
-  // if ((millis() - last_count) > 1000) {
-  //     Serial.print("FPS: ");
-  //     Serial.println(frames, DEC);
-  //     frames = 0;
-  //     last_count = millis();
-
-  //     Serial.print("Interrupt count: ");
-  //     Serial.println(transfer_count, DEC);
-
-  // }
-  // Periodically reset reg1 update incase of corruption
-  // or the panel power being reset (and ESP32 still running)
-  // static unsigned long last_refresh = 0;
-  // if ((millis() - last_refresh) > 10000) {
-  //   matrix.refreshMatrixSetup();
-  //   last_refresh = millis();
-  // }
-
-  // -------Cube---------//
-  // picture loop
-  //   for (int angle = 0; angle <= 360; angle = angle + 3) {
-
-  //        for (int i = 0; i < 8; i++) {
-
-  //       memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);    // accidenty display configuration registers id we don't clear th
-
-  //      rot = angle * 0.0174532; //0.0174532 = one degree
-  //  //rotateY
-  //      rotz = cube_vertex[i][2] * cos(rot) - cube_vertex[i][0] * sin(rot);
-  //      rotx = cube_vertex[i][2] * sin(rot) + cube_vertex[i][0] * cos(rot);
-  //      roty = cube_vertex[i][1];
-  //  //rotateX
-  //      rotyy = roty * cos(rot) - rotz * sin(rot);
-  //      rotzz = roty * sin(rot) + rotz * cos(rot);
-  //      rotxx = rotx;
-  //  //rotateZ
-  //      rotxxx = rotxx * cos(rot) - rotyy * sin(rot);
-  //      rotyyy = rotxx * sin(rot) + rotyy * cos(rot);
-  //      rotzzz = rotzz;
-
-  //  //orthographic projection
-  //      rotxxx = rotxxx + originx;
-  //      rotyyy = rotyyy + originy;
-
-  //  //store new vertices values for wireframe drawing
-  //      wireframe[i][0] = rotxxx;
-  //      wireframe[i][1] = rotyyy;
-  //      wireframe[i][2] = rotzzz;
-
-  //      draw_vertices();
-  //     }
-
-  //     draw_wireframe();
-  //   }
-
-
-  // -------end---------//
-
-  // -------Fastnoise---------//
-
-
-  // mbi_update_frame(true);
-
-  // spi_transfer_loop_stop();
-  // mbi_v_sync_dma();
-  // spi_transfer_loop_restart();
-
-  // memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
-  // for (int i = 0; i < 80; i++) {
-  //   for (int j = 0; j < 80; j++) {
-  //     int col = int((1 + noise.GetNoise(j * simplexScale * 10, i * simplexScale * 10, float(millis() * simplexSpeed / 50))) * 127);
-  //     col += simplexBrightness;
-  //     col = constrain(col, 0, 255);
-  //     float contrastFactor = (259 * (simplexContrast + 255)) / (255 * (259 - simplexContrast));
-  //     col = contrastFactor * (col - 128) + 128;
-  //     col = constrain(col, 0, 255);
-
-  //     mbi_set_pixel(j, i, uint8_t(col * simplexColorR / 255.0f), uint8_t(col * simplexColorG / 255.0f), uint8_t(col * simplexColorB / 255.0f));
-  //   }
-  // }
 
   updateNoise();
   matrix.fillCircleDMA(40, 40, 5, 255, 0, 0);
@@ -324,9 +205,21 @@ void loop() {
   
   static unsigned long lastTime = 0;
   unsigned long currentTime = millis();
-  log_e("Time since last loop: %lu ms", currentTime - lastTime);
-  // log_e("CPU Speed is %d", getCpuFrequencyMhz());
-  lastTime = currentTime;
+
+  if ((currentTime - lastTime) > 1000)
+  {
+    // Every Second
+  //  log_e("Time since last loop: %lu ms", currentTime - lastTime);
+
+    // Serial logging pauses stuff and causes flicker
+    //log_e("Transfer count: %d", transfer_count);
+
+    lastTime = currentTime;
+
+  }
+
+
+
 
   // -------end---------//
 

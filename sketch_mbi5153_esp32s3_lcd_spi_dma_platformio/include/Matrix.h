@@ -14,7 +14,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lcd_dma_parallel16.hpp"
-#include "MatrixSettings.h"
+//#include "MatrixSettings.h"
 #include "sdkconfig.h"
 #include "spi_dma_tx_loop.h"
 
@@ -59,77 +59,22 @@
 
 */
 
-#ifndef _swap_int16_t
-#define _swap_int16_t(a, b) \
-  {                         \
-    int16_t t = a;          \
-    a = b;                  \
-    b = t;                  \
-  }
-#endif
 
 class Matrix {
  public:
   Matrix() {
-    lcd_dma_test_payload = (uint16_t *)heap_caps_malloc(100 * sizeof(uint16_t), MALLOC_CAP_DMA);
-    assert(lcd_dma_test_payload != nullptr);
-    // Initialize the array
-    for (int i = 0; i < 100; i++) {
-      lcd_dma_test_payload[i] = (i % 2 == 0) ? 0xffff : 0x0000;
-    }
     TAG = "matrix_main";
   }
 
   ~Matrix() {
-    heap_caps_free(lcd_dma_test_payload);
+
   }
 
-  void initMatrix() {
-    updateRegister();
-    memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);    // accidenty display configuration registers id we don't clear th
-    //mbi_set_pixel(0,0, 255,255,255);
-    // for (int p = 0; p < 78; p++)
-    // {
-    //   mbi_set_pixel(p,p, 255,255,255);
-    //   mbi_set_pixel((78-p),p, 255,255,255);
-    // }
-
-    mbi_update_frame(true);    
-    //ESP_LOGD(TAG, "Sending greyscale data buffer out via LCD DMA.");
-    //dma_bus.send_stuff_once(dma_grey_gpio_data, counter2*sizeof(uint16_t), true); // sending payload hence TRUE 
-
-    spi_transfer_loop_stop();
-    mbi_v_sync_dma();
-    spi_transfer_loop_restart();
-  }
-
-  void refreshMatrixSetup() {
-    // spi_transfer_loop_stop();
-    mbi_pre_active_dma();  // 14 clocks
-    mbi_send_config_reg1_dma();
-    // MBI Step 2) Some other register 2 hack to reduce ghosting.
-    // mbi_pre_active_dma();
-    // mbi_send_config_reg2_dma();
-  }
-
-  void update() {
-    mbi_update_frame(true);
-
-    spi_transfer_loop_stop();
-    mbi_v_sync_dma();
-    spi_transfer_loop_restart();
-    memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
-  }
-
-  void updateRegister() {
-    esp_rom_gpio_pad_select_gpio(MBI_SRCLK);  // scan row clock in?
-    gpio_set_direction(MBI_SRCLK, GPIO_MODE_OUTPUT);
-    gpio_set_level(MBI_SRCLK, 0);  // to aid with debugging
-
-    ESP_LOGD(TAG, "Allocation DMA Memory And Buffer");
-
-    // Step 1) Allocate raw buffer space for MBI5153 greyscale / pixel memory
-    dma_grey_buffer_size = sizeof(ESP32_GREY_DMA_STORAGE_TYPE) * ((PANEL_SCAN_LINES * PANEL_MBI_RES_X * 16) + 100);  // add some extract blank data at the end for time to latch if we're updating the greyscale buffers
+  void initMatrix() 
+  {
+    // Step 1) Allocate raw buffer space for MBI5153 greyscale / MBI chip command /  pixel memory
+    dma_grey_buffer_parallel_bit_length = ((PANEL_SCAN_LINES * PANEL_MBI_RES_X * 16));
+    dma_grey_buffer_size = sizeof(ESP32_GREY_DMA_STORAGE_TYPE) * dma_grey_buffer_parallel_bit_length;  // add some extract blank data at the end for time to latch if we're updating the greyscale buffers
     ESP_LOGD(TAG, "Allocating greyscale DMA memory buffer. Size of memory required: %lu bytes.", dma_grey_buffer_size);
 
     // Malloc Greyscale / Command DMA Memory
@@ -139,7 +84,7 @@ class Matrix {
     // Fill with zeros to start with
     memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
 
-    // Setup DMA and Output to GPIO
+    // Setup LCD DMA and Output to GPIO
     auto bus_cfg = dma_bus.config();
     bus_cfg.pin_wr = MBI_DCLK;  // DCLK Pin
     bus_cfg.invert_pclk = false;
@@ -163,17 +108,74 @@ class Matrix {
     dma_bus.config(bus_cfg);
     dma_bus.setup_lcd_dma_periph();
 
-    initialized = true;
-    // Send blank message payload just to get DMA descriptors setup.
-    // mbi_update_frame(true);
-
-    // CURRENT STATUS - LOOPS FOREVER, BUT WOORKING!
-    // dma_bus.send_stuff_once(lcd_dma_test_payload, sizeof(lcd_dma_test_payload));
-
-    // gpio_set_level(MBI_SRCLK,   1); // to aid with debugging
-
-    // Start GCLK via SPI
+    // Setup SPI DMA Output for GCLK and Address Lines
     spi_setup();
+
+
+    initialized = true;
+
+    updateRegisters();
+
+    update();
+ 
+/*
+    mbi_update_frame(true); // send blank frame    
+    //ESP_LOGD(TAG, "Sending greyscale data buffer out via LCD DMA.");
+    //dma_bus.send_stuff_once(dma_grey_gpio_data, counter2*sizeof(uint16_t), true); // sending payload hence TRUE 
+
+    spi_transfer_loop_stop();
+    mbi_v_sync_dma();
+    spi_transfer_loop_restart();
+*/    
+  }
+
+  void refreshMatrixConfig() {
+
+    // spi_transfer_loop_stop();
+    mbi_pre_active_dma();  // 14 clocks
+    mbi_send_config_reg1_dma();
+
+    // MBI Step 2) Some other register 2 hack to reduce ghosting.
+    // mbi_pre_active_dma();
+    // mbi_send_config_reg2_dma();
+  }
+
+
+/*
+  // MBI5152 Application Note V1.00- EN
+  
+  <snipped>
+  7. After the last data latch, it needs at least 50 GCLKs to read the gray scale data into internal display buffer
+  before the Vsync command comes.
+  8. Display is updated immediately when MBI5152 receives the Vsync signal.
+  9. GCLK must keep at low level more than 7ns before MBI5152 receives the Vsync signal.
+  10. The period of dead time (ie. The 1025th GCLK) must be larger than 100ns.
+
+  The gray scale data needs the GCLK to save the data into SRAM. The frequency of GCLK must be higher
+  than 20% of DCLK to get the correct data.
+
+  // MBI5153
+  After the last data latch command, it needs at least 50 GCLKs to read the gray scale data into internal display
+  buffer before the Vsync command comes. And display is updated immediately until MBI5051/52/53 receives
+  the Vsync signal (high pulse of LE pin is sampled by 3-DCLK rising edges), as figure 6 shows.
+
+*/
+  void update() {
+
+    mbi_update_frame(true);
+    spi_transfer_loop_stop();
+    mbi_v_sync_dma();
+    spi_transfer_loop_restart();        
+
+    //log_e("tsfr count: %d", dma_bus.get_transfer_count());
+
+
+    memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
+
+  }
+
+  void updateRegisters() 
+  {
     spi_transfer_loop_start();  // start GCLK + Adress toggling
 
     // MBI Step 1) Set key registers, such as number of rows
@@ -483,7 +485,10 @@ class Matrix {
 
   uint16_t *lcd_dma_test_payload;
   ESP32_GREY_DMA_STORAGE_TYPE *dma_grey_gpio_data;
-  size_t dma_grey_buffer_size;
+
+  size_t dma_grey_buffer_parallel_bit_length; // Length in bits of the buffer -> sequance of 13 x 16 bits (2 bytes) sent in parallel = length value of 13
+  size_t dma_grey_buffer_size; // length of buffer in memory used -> sequance of 13 x 16 bits (2 bytes) sent in parallel = value of 26 bytes
+
 
   void mbi_update_frame(bool configure_latches) {
     if (configure_latches) {
@@ -513,7 +518,7 @@ class Matrix {
       }
     }
 
-    log_d(TAG, "Sending greyscale data buffer out via LCD DMA.");
+    //log_d(TAG, "Sending greyscale data buffer out via LCD DMA.");
     dma_bus.send_stuff_once(dma_grey_gpio_data, dma_grey_buffer_size, true);  // sending payload hence TRUE
 
   }  // mbi_update_frame
@@ -533,6 +538,7 @@ class Matrix {
     The 16384 GCLKs (14-bit) PWM cycle of MBI5052/53 is divided into 32 sections, each section has 512 GCLKs.
   */
   void mbi_set_pixel(uint8_t x, uint8_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data) {
+    
     if (x >= PANEL_PHY_RES_X || y >= PANEL_PHY_RES_Y) {
       return;
     }
@@ -546,7 +552,7 @@ class Matrix {
     uint16_t b_14bit_data = (b_data * 64) << 2;
     uint16_t r_14bit_data = (r_data * 64) << 2;  // could just bit shift by << 6  in total instead
 
-    ESP_LOGD(TAG, "Converted 14bit colour value r: %d,  g: %d,  b: %d", g_14bit_data, g_14bit_data, b_14bit_data);
+    ESP_LOGV(TAG, "Converted 14bit colour value r: %d,  g: %d,  b: %d", g_14bit_data, g_14bit_data, b_14bit_data);
 
     // x and y positions start from 0, so 0-78 are valid values only
     uint16_t g_gpio_bitmask = BIT_G1;  // bit 0
@@ -604,7 +610,7 @@ class Matrix {
         dma_grey_gpio_data[bit_start_pos] |= r_gpio_bitmask;
       }
 
-      ESP_LOGD(TAG, "Setting dma_grey_gpio_data from bit_start_pos %d. Value %d", bit_start_pos, dma_grey_gpio_data[bit_start_pos]);
+      ESP_LOGV(TAG, "Setting dma_grey_gpio_data from bit_start_pos %d. Value %d", bit_start_pos, dma_grey_gpio_data[bit_start_pos]);
 
       bit_start_pos++;
     }
@@ -645,8 +651,9 @@ class Matrix {
   the Vsync signal (high pulse of LE pin is sampled by 3-DCLK rising edges), as figure 6 shows.
   */
   void mbi_v_sync_dma() {
-    ESP_LOGD(TAG, "Send MBI Vert Sync.");
-
+    ESP_LOGV(TAG, "Send MBI Vert Sync.");
+  
+    /*
     int payload_length = 0;
     for (int i = 0; i < 3; i++) {
       dma_grey_gpio_data[payload_length] = BIT_LAT;
@@ -655,6 +662,17 @@ class Matrix {
 
     dma_grey_gpio_data[payload_length] = 0x00;
     payload_length++;
+    */
+    memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
+
+    // Send the Vsync somewhere in the middle of the gclk data.
+    int payload_length = 7200; // <------------ CHANGE THIS IF YOU GET WEIRD STUFF, CAN'T BE HIGHER THAN 20000!
+    int start_pos = payload_length - 512; // start 512 back again
+    for (int i = 0; i < 3; i++) {
+      dma_grey_gpio_data[start_pos++] = BIT_LAT;
+    }
+
+    dma_grey_gpio_data[start_pos++] = 0x00;
 
     dma_bus.send_stuff_once(dma_grey_gpio_data, payload_length * sizeof(ESP32_GREY_DMA_STORAGE_TYPE), false);
 
