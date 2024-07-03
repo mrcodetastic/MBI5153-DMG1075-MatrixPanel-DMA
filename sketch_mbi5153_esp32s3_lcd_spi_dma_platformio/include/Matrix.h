@@ -16,7 +16,7 @@
 #include "lcd_dma_parallel16.hpp"
 //#include "MatrixSettings.h"
 #include "sdkconfig.h"
-#include "spi_dma_tx_loop.h"
+#include "spi_dma_seg_tx_loop.h"
 
 #ifndef _swap_int16_t
 #define _swap_int16_t(a, b) \
@@ -59,11 +59,11 @@
 
 */
 
+static const char *TAG = "Matrix.h";
 
 class Matrix {
  public:
   Matrix() {
-    TAG = "matrix_main";
   }
 
   ~Matrix() {
@@ -165,7 +165,7 @@ class Matrix {
     mbi_update_frame(true);
     spi_transfer_loop_stop();
     mbi_v_sync_dma();
-    spi_transfer_loop_restart();        
+    spi_transfer_loop_start();        
 
     //log_e("tsfr count: %d", dma_bus.get_transfer_count());
 
@@ -666,7 +666,7 @@ class Matrix {
     memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
 
     // Send the Vsync somewhere in the middle of the gclk data.
-    int payload_length = 7200; // <------------ CHANGE THIS IF YOU GET WEIRD STUFF, CAN'T BE HIGHER THAN 20000!
+    int payload_length = 1024; // 8100; // <------------ CHANGE THIS IF YOU GET WEIRD STUFF, CAN'T BE HIGHER THAN 20000!
     int start_pos = payload_length - 512; // start 512 back again
     for (int i = 0; i < 3; i++) {
       dma_grey_gpio_data[start_pos++] = BIT_LAT;

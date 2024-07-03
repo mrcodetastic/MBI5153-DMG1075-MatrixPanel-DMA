@@ -2,8 +2,8 @@
 //          Credit to: https://github.com/MCJack123/
 
 
-#ifndef VGA_H
-#define VGA_H
+#ifndef ESP32S3_SPI_DMA_SEG_TRANSFER_LOOP
+#define ESP32S3_SPI_DMA_SEG_TRANSFER_LOOP
 
 #include <esp_err.h>
 #include <esp_log.h>
@@ -18,12 +18,14 @@ extern "C"
 {
 #endif
 
-extern volatile int transfer_count;
+esp_err_t spi_setup(void);
+esp_err_t spi_transfer_loop_start(void);
+esp_err_t spi_transfer_loop_stop(void); // generates interrupt
 
-extern esp_err_t spi_setup(void);
-extern esp_err_t spi_transfer_loop_start(void);
-extern esp_err_t spi_transfer_loop_stop(void);
-extern esp_err_t spi_transfer_loop_restart(void);
+int      spi_get_transfer_count();
+bool     spi_seg_transfer_is_complete();
+uint32_t get_gpspi2_intr_val();
+
 
 #ifdef __cplusplus
 }

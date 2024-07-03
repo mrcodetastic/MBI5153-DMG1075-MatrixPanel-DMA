@@ -1,242 +1,89 @@
 #include <Matrix.h>
 #include <FastNoise.h>
-// #include "e131.h"
-// #include "wificonnect.h"
-
-
-/*
-  // MBI5152 Application Note V1.00- EN
-
-  Section 2: The Setting of Gray Scale
-  The setting of gray scale data describes as below.
-  1. The sequence of input data starts from scan line 1 scan line 2….  scan line M-1 scan line M
-  (M≦16)
-  2. The data sequence of cascaded IC is ICnICn-1…. IC2IC1.
-  3. The data sequence of each channel is ch15ch14…. ch0.
-  4. The data length of each channel is 16-bits, and the default PWM mode is 16-bits. The sequence of gray
-  sacle is bit15bit14bit13…bit0 as figure 4 shows. The 14-bits gray scale can be set through Bit[7]=1
-  in configuration register 1, and the sequence of gray scale data is bit13bit12… bit0 0 0, the
-  last 2-bits (LSB) are set to “0”.
-  5. The frequency of GCLK must be higher than 20% of DCLK to get the correct gray scale data.
-  6. LE executes the data latch to send gray scale data into SRAM. Each 16xN bits data needs a “data latch
-  command”, where N means the number of cascaded driver.
-  7. After the last data latch, it needs at least 50 GCLKs to read the gray scale data into internal display buffer
-  before the Vsync command comes.
-  8. Display is updated immediately when MBI5152 receives the Vsync signal.
-  9. GCLK must keep at low level more than 7ns before MBI5152 receives the Vsync signal.
-  10. The period of dead time (ie. The 1025th GCLK) must be larger than 100ns.
-
-  The gray scale data needs the GCLK to save the data into SRAM. The frequency of GCLK must be higher
-  than 20% of DCLK to get the correct data.
-
-  // MBI5153
-  After the last data latch command, it needs at least 50 GCLKs to read the gray scale data into internal display
-  buffer before the Vsync command comes. And display is updated immediately until MBI5051/52/53 receives
-  the Vsync signal (high pulse of LE pin is sampled by 3-DCLK rising edges), as figure 6 shows.
-
-*/
-static const char *TAG = "app_main";
+#include <array>
 
 Matrix matrix;
 
-FastNoiseLite noise;
-// E131 e131;
+void hsvToRgb(float h, float s, float v, uint16_t &ret_r, uint16_t &ret_g, uint16_t &ret_b) {
+    float r, g, b;
+    int i = (int)(h * 6);
+    float f = h * 6 - i;
+    float p = v * (1 - s);
+    float q = v * (1 - f * s);
+    float t = v * (1 - (1 - f) * s);
 
-float simplexColorR = 0;
-float simplexColorG = 100;
-float simplexColorB = 150;
-
-float simplexFrequency = 0.05;
-float simplexSpeed = .002;
-
-TaskHandle_t updateMatrixTaskHandle;
-TaskHandle_t updateNoiseTaskHandle;
-TaskHandle_t updateRegisterTaskHandle;
-
-SemaphoreHandle_t matrixUpdatedSemaphore;
-
-
-/************************************************************************/
-float tx, nx, p;
-float ty, ny, py;
-float rot, rotx, roty, rotz, rotxx, rotyy, rotzz, rotxxx, rotyyy, rotzzz;
-int i;          // 0 to 360
-int fl, scale;  // focal length
-int wireframe[12][2];
-
-int originx = 40;
-int originy = 40;  // 32
-
-int front_depth = 20;
-int back_depth = -20;
-
-const char* Matrix::TAG = "Matrix";// Store cube vertices
-
-int cube_vertex[8][3] = {
-    {-20, -20, front_depth},
-    {20, -20, front_depth},
-    {20, 20, front_depth},
-    {-20, 20, front_depth},
-    {-20, -20, back_depth},
-    {20, -20, back_depth},
-    {20, 20, back_depth},
-    {-20, 20, back_depth}};
-
-/********************************************************************/
-
-/********************************************************************/
-
-void updateNoise() {
-  // -------Fastnoise---------//
-  // float col = .1;
-  for (float i = 0; i < 78; i++) {
-    for (float j = 0; j < 78; j++) {
-      float col = (1 + noise.GetNoise(j, i, (millis() * simplexSpeed)))/2;
-
-      matrix.drawPixel(j, i, (col * simplexColorR), (col * simplexColorG), (col * simplexColorB));
+    switch (i % 6) {
+        case 0: r = v, g = t, b = p; break;
+        case 1: r = q, g = v, b = p; break;
+        case 2: r = p, g = v, b = t; break;
+        case 3: r = p, g = q, b = v; break;
+        case 4: r = t, g = p, b = v; break;
+        case 5: r = v, g = p, b = q; break;
     }
-  }
-}
 
-void timer_callback(void* arg) {
-  updateNoise();
-  matrix.update();
-}
-
-void setup_periodic_timer() {
-  const esp_timer_create_args_t periodic_timer_args = {
-      .callback = &timer_callback,
-      .name = "periodic_60ms_timer"
-  };
-
-  esp_timer_handle_t periodic_timer;
-  ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
-  ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 60000)); // 60,000 microseconds = 60ms
-}
-
-void testingTask(void *parameter) {
-  const TickType_t xFrequency = pdMS_TO_TICKS(60); // 2000 ms interval (2 seconds)
-  TickType_t xLastWakeTime = xTaskGetTickCount(); // Get the current tick count
-
-  for (;;) {
-    matrix.update();
-    updateNoise(); // Call the testing function
-    vTaskDelayUntil(&xLastWakeTime, xFrequency); // Delay until the next 2 seconds
-  
-  static unsigned long lastTime = 0;
-  unsigned long currentTime = millis();
-
-  //ESP_LOGE(TAG, "Time since last loop: %lu ms", currentTime - lastTime);
-  lastTime = currentTime;
-
-  }
-}
-
-void updateNoiseTask(void *parameter) {
-  for (;;) {
-    UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark(NULL);
-    ESP_LOGD(TAG, "updateNoise %d", uxHighWaterMark);
-    xSemaphoreTake(matrixUpdatedSemaphore, portMAX_DELAY); // Wait for updateMatrix to complete
-    
-    updateNoise();
-
-  // ESP_LOGE(TAG, "Current timecode: %lu", millis());
-  }
-}
-
-void updateMatrixTask(void *parameter) {
-  const TickType_t xFrequency = pdMS_TO_TICKS(60); // 30 ms interval
-  TickType_t xLastWakeTime = xTaskGetTickCount(); // Get the current tick count
-
-  for (;;) {
-    // Wait for the next cycle.
-    UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark(NULL);
-    ESP_LOGD(TAG, "updateMatrix: %d", uxHighWaterMark);
-    matrix.update();
-    xSemaphoreGive(matrixUpdatedSemaphore); // Signal that updateMatrix is done
-    vTaskDelayUntil(&xLastWakeTime, xFrequency);
-  }
-}
-
-void updateRegisterTask(void *parameter) {
-  const TickType_t xFrequency = pdMS_TO_TICKS(10000); // 30 ms interval
-  TickType_t xLastWakeTime = xTaskGetTickCount(); // Get the current tick count
-
-  for (;;) {
-    // Wait for the next cycle.
-    UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark(NULL);
-    ESP_LOGD(TAG, "updateRegister: %d", uxHighWaterMark);
-    matrix.updateRegisters();
-    vTaskDelayUntil(&xLastWakeTime, xFrequency);
-  }
+    ret_r = (uint16_t)(r * 255);
+    ret_g = (uint16_t)(g * 255);
+    ret_b = (uint16_t)(b * 255);
 }
 
 
 // Start the App
-void setup(void) {
-  // Serial.begin(115200);
-  delay(2);
+void setup(void) 
+{
+
+  Serial.begin(115200);
+  delay(100);
   Serial.println("Starting....");
   Serial.print("setup() running on core ");
   Serial.println(xPortGetCoreID());
   esp_task_wdt_deinit();
 
-  // matrix = new Matrix();
-
-  // connectWiFi();
-  // e131.begin();
-
   matrix.initMatrix();
-
-  noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
-  noise.SetFrequency(simplexFrequency);
-  matrixUpdatedSemaphore = xSemaphoreCreateBinary();
 
 }
 
-
-extern volatile int transfer_count;
-
-void loop() {
-
-  updateNoise();
-  matrix.fillCircleDMA(40, 40, 5, 255, 0, 0);
-  matrix.update();
-  
+float angle = 0.0f;
+uint16_t r,g,b;
+int frame_count = 0;
+void loop() 
+{
   static unsigned long lastTime = 0;
   unsigned long currentTime = millis();
 
+  frame_count++;
+
+  uint16_t cr, cg, cb;
+
+  for (int y = 0; y < PANEL_MBI_RES_Y; y++) {
+            for (int x = 0; x < PANEL_MBI_RES_X; x++) {
+                float dx = x - PANEL_MBI_RES_X / 2;
+                float dy = y - PANEL_MBI_RES_Y / 2;
+                float distance = sqrt(dx * dx + dy * dy);
+                float theta = atan2(dy, dx) + angle;
+                float hue = fmod((theta / (2 * PI)) + 1.0f, 1.0f);
+                hsvToRgb(hue, 1.0f, 1.0f,r,g,b);
+                matrix.drawPixel(x, y, r,g,b);
+
+                if (y==46 & x == 39)
+                {
+                  cr = r; cb = b; cg = g;
+                }
+
+            }
+   }
+
+  matrix.fillCircleDMA(40, 40, 5, cr, cg, cb);   
+
   if ((currentTime - lastTime) > 1000)
   {
-    // Every Second
-  //  log_e("Time since last loop: %lu ms", currentTime - lastTime);
-
-    // Serial logging pauses stuff and causes flicker
-    //log_e("Transfer count: %d", transfer_count);
-
+    Serial.print("FPS: ");
+    Serial.println(frame_count, DEC);
+    
+    frame_count = 0;
     lastTime = currentTime;
 
-  }
+  }   
 
-
-
-
-  // -------end---------//
-
-  // -------e131---------//
-  //     memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
-
-  //   for (int i = 0; i < 78; i++) {
-  //    for (int j = 0; j < 78; j++) {
-  //       uint8_t col = wsRawData[(i*78+j)];
-  //       mbi_set_pixel(j, i, col, col, col);
-  //    }
-  //  }
-
-  //     mbi_update_frame(true);
-  //     spi_transfer_loop_stop();
-  //     mbi_v_sync_dma();
-  //     spi_transfer_loop_restart();
-
-  // ---------end--------//
+  matrix.update();
+  angle += 0.01f;
 }
