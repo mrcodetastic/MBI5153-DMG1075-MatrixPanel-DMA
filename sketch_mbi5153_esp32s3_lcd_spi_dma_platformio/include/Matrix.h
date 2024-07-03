@@ -63,11 +63,10 @@ static const char *TAG = "Matrix.h";
 
 class Matrix {
  public:
-  Matrix() {
-  }
+  Matrix() {  }
 
   ~Matrix() {
-
+    
   }
 
   void initMatrix() 
