@@ -23,7 +23,6 @@ esp_err_t spi_transfer_loop_start(void);
 esp_err_t spi_transfer_loop_stop(void); // generates interrupt
 
 int      spi_get_transfer_count();
-bool     spi_seg_transfer_is_complete();
 uint32_t get_gpspi2_intr_val();
 
 

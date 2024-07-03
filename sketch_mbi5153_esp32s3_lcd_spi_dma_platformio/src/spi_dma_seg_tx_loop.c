@@ -117,15 +117,9 @@ int spi_get_transfer_count () {
   return spi_seg_transfer_count;
 }
 
-IRAM_ATTR bool spi_seg_transfer_is_complete() {
-  return spi_seg_transfer_complete;
-}
-
 uint32_t get_gpspi2_intr_val(){
   return GPSPI2.dma_int_st.val;
 }
-
-
 
 /**************************************************************************************/
 // Step 1 - Create individual dma descriptors for payload
@@ -346,6 +340,7 @@ esp_err_t spi_dma_seg_setup()
 
 }
 
+/*
 esp_err_t spi_dma_seg_setup_old()
 {
   // NOTES:
@@ -420,7 +415,7 @@ esp_err_t spi_dma_seg_setup_old()
   return ESP_OK;
 
 }
-
+*/
 
 
 esp_err_t spi_transfer_loop_start()

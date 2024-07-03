@@ -478,12 +478,12 @@ class Matrix {
   }
 
  protected:
-  static const char *TAG;
+
   bool initialized = false;
+
   // D<A Data to send
   Bus_Parallel16 dma_bus;
 
-  uint16_t *lcd_dma_test_payload;
   ESP32_GREY_DMA_STORAGE_TYPE *dma_grey_gpio_data;
 
   size_t dma_grey_buffer_parallel_bit_length; // Length in bits of the buffer -> sequance of 13 x 16 bits (2 bytes) sent in parallel = length value of 13
@@ -522,9 +522,7 @@ class Matrix {
     dma_bus.send_stuff_once(dma_grey_gpio_data, dma_grey_buffer_size, true);  // sending payload hence TRUE
 
   }  // mbi_update_frame
-  void lcd_send_test_payload() {
-    dma_bus.send_stuff_once(lcd_dma_test_payload, sizeof(lcd_dma_test_payload), false);
-  }
+
 
   /*
     Gray Scale Mode and Scan-type S-PWM
