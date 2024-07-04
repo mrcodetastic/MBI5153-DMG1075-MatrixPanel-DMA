@@ -272,8 +272,8 @@ esp_err_t spi_transfer_initial_payload()
 
   // What do we do here? TO DO, send null packet just to kick off transfer?
   // https://www.esp32.com/viewtopic.php?p=123221#p123211
-  trans.tx_buffer = spi_tx_payload_testchunk2; 
-  trans.length = (sizeof(spi_tx_payload_testchunk2)) * 8;
+  trans.tx_buffer = spi_tx_octal_payload; 
+  trans.length = (sizeof(spi_tx_octal_payload)) * 8;
   trans.rx_buffer = NULL; 
   trans.rxlength = 0;
 
@@ -316,14 +316,14 @@ esp_err_t spi_dma_seg_setup()
   spi_seg_conf_1[1]  = spi_seg_conf_value_nxt_true; // If this bit is set, it means this configurable segmented transfer will continue its next transaction (segment).
 
   // SPI_MS_DLEN_REG
-  spi_seg_conf_1[2] = (sizeof(spi_tx_payload_testchunk2) * 8) -1; // must match exactly the dma payload total chunk size -1
+  spi_seg_conf_1[2] = (sizeof(spi_tx_octal_payload) * 8) -1; // must match exactly the dma payload total chunk size -1
 
 
   // Set up linked lists for next descriptors
   // lldesc_setup_link is in soc/lldesc.c
 
   dma_lldesc_required = 1; // for CONF dma lldesc 
-  dma_lldesc_required += lldesc_get_required_num(sizeof(spi_tx_payload_testchunk2)); 
+  dma_lldesc_required += lldesc_get_required_num(sizeof(spi_tx_octal_payload)); 
   ESP_LOGI(TAG, "%d SPI DMA descriptors required for cover spi_tx_payload_chunk2 data.", dma_lldesc_required);   
 
   // Allocate memory
@@ -332,7 +332,7 @@ esp_err_t spi_dma_seg_setup()
   // Future note: Each SPI segment must be < 32kB.
   int offset = 0;
   offset = lldesc_setup_chunk(dma_data_lldesc, &spi_seg_conf_1, 4*3, 0); // setup dma link list descriptor for CONF data
-  offset = lldesc_setup_chunk(dma_data_lldesc, &spi_tx_payload_testchunk2, sizeof(spi_tx_payload_testchunk2), offset); // setup dma link list descriptors for payload
+  offset = lldesc_setup_chunk(dma_data_lldesc, &spi_tx_octal_payload, sizeof(spi_tx_octal_payload), offset); // setup dma link list descriptors for payload
 
   lldesc_setup_chain(dma_data_lldesc, dma_lldesc_required, true); // link them all together
 
