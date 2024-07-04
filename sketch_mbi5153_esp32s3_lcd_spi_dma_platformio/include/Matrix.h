@@ -610,7 +610,7 @@ class Matrix {
 
 
   // About 10% slower than the new implementation.
-  void mbi_set_pixel_orig(uint8_t x, uint8_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data) {
+  void mbi_set_pixel_old(uint8_t x, uint8_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data) {
     
     if (x >= PANEL_PHY_RES_X || y >= PANEL_PHY_RES_Y) {
       return;
