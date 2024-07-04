@@ -1,4 +1,11 @@
-Default pin mapping is as follows:
+## 78 x 78 pixel eWaste Panel
+![image](https://github.com/mrcodetastic/ESP32S3-MBI5153-DMG1075-DMA/assets/12006953/55241e2b-edfa-4dc6-80c6-e6e21618c9ec)
+
+Uses PWM based chip that takes 16 bits sent serially for every pixel in the relevant colour chain. 
+
+There are 12 channels, as the panel is broken into 4 x RGB sections for each 1/4 of the panel (20 pixel in height each, for a total of 80px).
+
+Sketch default pin mapping is as follows:
 
 ```
 
