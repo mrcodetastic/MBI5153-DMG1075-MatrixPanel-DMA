@@ -125,20 +125,19 @@
 
     const config_t& config(void) const { return _cfg; }
     void  config(const config_t& config);
-   
-    esp_err_t setup_lcd_dma_periph(void) ;
-    esp_err_t release(void) ;
-
-    bool      allocate_dma_desc_memory (size_t len);
-
-    esp_err_t dma_transfer_start();
+    
+    esp_err_t setup_lcd_dma_periph(void) ;       
     esp_err_t send_stuff_once(void *data, size_t size_in_bytes, bool is_greyscale_data = false);
 
     int get_transfer_count();
-    //void dma_transfer_restart();    
-    //void dma_transfer_pause();        
-    //void dma_transfer_stop();
-    
+
+  protected:
+
+    esp_err_t release(void) ;
+    bool      allocate_dma_desc_memory (size_t len);
+    esp_err_t dma_transfer_start();
+
+     
   private:
 
     config_t _cfg;

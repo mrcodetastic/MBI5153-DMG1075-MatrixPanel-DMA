@@ -82,6 +82,7 @@ int Bus_Parallel16::get_transfer_count() {
 // ------------------------------------------------------------------------------
 void Bus_Parallel16::config(const config_t &cfg) {
   _cfg = cfg;
+  
 }
 
 
