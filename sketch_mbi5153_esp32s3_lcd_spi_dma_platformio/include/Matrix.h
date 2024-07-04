@@ -115,12 +115,11 @@ class Matrix {
     // Setup SPI DMA Output for GCLK and Address Lines
     spi_setup();
 
-
-    initialized = true;
-
     updateRegisters();
 
     update();
+
+    initialized = true;    
  
 /*
     mbi_update_frame(true); // send blank frame    
@@ -165,6 +164,8 @@ class Matrix {
 
 */
   void update() {
+
+    assert(initialized);
 
     mbi_update_frame(true);
     spi_transfer_loop_stop();
