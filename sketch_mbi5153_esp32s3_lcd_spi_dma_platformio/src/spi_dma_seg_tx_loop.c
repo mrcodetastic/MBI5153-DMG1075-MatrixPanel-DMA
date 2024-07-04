@@ -453,6 +453,8 @@ esp_err_t spi_transfer_loop_start()
   GPSPI2.dma_int_ena.dma_seg_trans_done = 1; // Doesn't work, so can't use it. :-(
   GPSPI2.dma_int_ena.trans_done = 1; // Doesn't work, so can't use it. :-(
 
+  GPSPI2.cmd.conf_bitlen = 0;
+
   ret = esp_intr_free(intr_handle);
 
   ret = esp_intr_alloc_intrstatus(ETS_SPI2_INTR_SOURCE, ESP_INTR_FLAG_SHARED, (uint32_t)&GPSPI2.dma_int_st.val, (SPI_DMA_SEG_TRANS_DONE_INT_ENA_M | SPI_SEG_MAGIC_ERR_INT_ENA_M | SPI_TRANS_DONE_INT_ENA_M), default_isr_handler,  NULL, &intr_handle); 
