@@ -309,19 +309,6 @@ esp_err_t Bus_Parallel16::send_stuff_once(void *data, size_t size_in_bytes, bool
 
   ESP_LOGV(TAG, "Sending DMA payload of length %d bytes.", size_in_bytes);
 
-  // Small optimisation
-  // If a previous call to this function was to send greyscale data, then we assume all the
-  // DMA desciptors have already been setup and are pointing to the right memory address of
-  // the greyscale image buffer data. No need to do all these chekcs again and rebuild the
-  // DMA chain again.
-  /*
-    if ((_prev_payload_was_greyscale == is_greyscale_data) && (_dmadesc_a != nullptr))
-    {    
-        // Just send it and leave.
-        return dma_transfer_start();
-    }
-    */
-
   int len = size_in_bytes;
 
   int dma_lldesc_required = lldesc_get_required_num(size_in_bytes);
@@ -358,37 +345,9 @@ esp_err_t Bus_Parallel16::send_stuff_once(void *data, size_t size_in_bytes, bool
   _dmadesc_a[n - 1].next = NULL;      // no next item
   //_dmadesc_a[n-1].next        = (dma_descriptor_t *) &_dmadesc_a[0]; // loop forever
 
-
-  _prev_payload_was_greyscale = is_greyscale_data;
-
   // Send it!
   return dma_transfer_start();
 }
-
-
-/*
-  void Bus_Parallel16::dma_transfer_restart()
-  {
-    LCD_CAM.lcd_user.lcd_start = 1;        // Trigger LCD DMA transfer
-    
-  } // end 
-
-    void Bus_Parallel16::dma_transfer_pause()
-  {
-    LCD_CAM.lcd_user.lcd_start = 0;        // Trigger LCD DMA transfer
-    
-  } // end 
-
-  void Bus_Parallel16::dma_transfer_stop()
-  {
-
- //      LCD_CAM.lcd_user.lcd_reset = 1;        // Trigger LCD DMA transfer
-  //      LCD_CAM.lcd_user.lcd_update = 1;        // Trigger LCD DMA transfer
-
-        gdma_stop(dma_chan);   
-        
-  } // end 
-  */
 
 
 #endif

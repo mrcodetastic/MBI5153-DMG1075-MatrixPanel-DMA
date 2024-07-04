@@ -149,8 +149,6 @@
     uint32_t _dmadesc_count  = 0;   // number of dma decriptors for current transaction
     uint32_t _dmadesc_count_sram_alloc = 0;   // how many dma descrptors can we fill in the current dma desc allocation?
 
-    bool _prev_payload_was_greyscale = false; // optimisation
-
     HUB75_DMA_DESCRIPTOR_T* _dmadesc_a = nullptr;
 
     esp_lcd_i80_bus_handle_t _i80_bus;
