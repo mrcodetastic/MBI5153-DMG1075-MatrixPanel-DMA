@@ -546,7 +546,71 @@ class Matrix {
 
     The 16384 GCLKs (14-bit) PWM cycle of MBI5052/53 is divided into 32 sections, each section has 512 GCLKs.
   */
+
   void mbi_set_pixel(uint8_t x, uint8_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data) {
+    
+    if (x >= PANEL_PHY_RES_X || y >= PANEL_PHY_RES_Y) {
+      return;
+    }
+
+    x += 2;  // offset for missing pixels on the left
+
+    // Calculate bitmasks
+    uint16_t _colourbitsoffset = (y / PANEL_SCAN_LINES) * 3; // three is an important bit
+    uint16_t _colourbitsclear  = ~(0b111 << _colourbitsoffset);  // invert
+
+    uint16_t g_gpio_bitmask = BIT_G1 << _colourbitsoffset;  // bit 0
+    uint16_t b_gpio_bitmask = BIT_B1 << _colourbitsoffset;  // bit 1
+    uint16_t r_gpio_bitmask = BIT_R1 << _colourbitsoffset;  // bit 2    
+
+    // Row offset + channel offset + individual IC LED offset
+    // Calculate data array start position
+    int y_normalised = y % PANEL_SCAN_LINES;  // Only have 20 rows of data...
+    int bit_start_pos = (1280 * y_normalised) + ((x % 16) * 80) + ((x / 16) * 16);  
+
+  /*
+      MBI5153 provides a selectable 14-bit or 13-bit gray scale by setting the configuration register1 bit [7]. The default 
+      value is set to ’0’ for 14-bit color depth. In 14-bit gray scale mode, users should still send 16-bit data with 2-bit ‘0’ in 
+      LSB bits. For example, {14’h1234, 2’h0}. 
+  */    
+
+    // RGB colour data provided is only 8bits, so we'll fill it from bit 16 down to bit 8
+    // 14-bit resolution = 16,384
+    //  8-bit resolutoin = 255     
+    int subpixel_colour_bit = 8;
+    uint8_t mask;
+    while (subpixel_colour_bit > 0)  // shift out MSB first per the documentation.
+    {
+      subpixel_colour_bit--;  // start from 7
+      dma_grey_gpio_data[bit_start_pos] &= _colourbitsclear; // celear what was there before   
+
+      mask = 1 << subpixel_colour_bit;      
+
+      if (g_data & mask) {
+        dma_grey_gpio_data[bit_start_pos] |= g_gpio_bitmask;
+      }
+
+      if (b_data & mask) {
+        dma_grey_gpio_data[bit_start_pos] |= b_gpio_bitmask;
+      }
+
+      if (r_data & mask) {
+        dma_grey_gpio_data[bit_start_pos] |= r_gpio_bitmask;
+      }
+
+      //ESP_LOGV(TAG, "Setting dma_grey_gpio_data from bit_start_pos %d. Value %d", bit_start_pos, dma_grey_gpio_data[bit_start_pos]);
+      bit_start_pos++;
+    }
+
+    // We assumpt bit_start_postions that should be cleared, are.
+        
+ 
+  }  // mbi_set_pixel
+
+
+
+  // About 10% slower than the new implementation.
+  void mbi_set_pixel_orig(uint8_t x, uint8_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data) {
     
     if (x >= PANEL_PHY_RES_X || y >= PANEL_PHY_RES_Y) {
       return;
@@ -577,22 +641,22 @@ class Matrix {
     b_gpio_bitmask = b_gpio_bitmask << _colourbitoffset;
     r_gpio_bitmask = r_gpio_bitmask << _colourbitoffset;
 
-    /*
-      if (y < 20) {
-      } else if (y < 40) {
-        b_gpio_bitmask = BIT_B2;
-        g_gpio_bitmask = BIT_G2;
-        r_gpio_bitmask = BIT_R2;
-      } else if (y < 60)  {
-        b_gpio_bitmask = BIT_B3;
-        g_gpio_bitmask = BIT_G3;
-        r_gpio_bitmask = BIT_R3;
-      } else {
-        b_gpio_bitmask = BIT_B4;
-        g_gpio_bitmask = BIT_G4;
-        r_gpio_bitmask = BIT_R4;
-      }
-      */
+    
+      // if (y < 20) {
+      // } else if (y < 40) {
+      //   b_gpio_bitmask = BIT_B2;
+      //   g_gpio_bitmask = BIT_G2;
+      //   r_gpio_bitmask = BIT_R2;
+      // } else if (y < 60)  {
+      //   b_gpio_bitmask = BIT_B3;
+      //   g_gpio_bitmask = BIT_G3;
+      //   r_gpio_bitmask = BIT_R3;
+      // } else {
+      //   b_gpio_bitmask = BIT_B4;
+      //   g_gpio_bitmask = BIT_G4;
+      //   r_gpio_bitmask = BIT_R4;
+      // }
+     
 
     // Row offset + channel offset + individual IC LED offset
     int y_normalised = y % PANEL_SCAN_LINES;  // Only have 20 rows of data...
