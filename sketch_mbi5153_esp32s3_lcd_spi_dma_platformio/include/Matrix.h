@@ -672,11 +672,12 @@ class Matrix {
     dma_grey_gpio_data[payload_length] = 0x00;
     payload_length++;
     */
-    memset(dma_grey_gpio_data, 0, dma_grey_buffer_size);
 
     // Send the Vsync somewhere in the middle of the gclk data.
-    int payload_length = 1024; // 8100; // <------------ CHANGE THIS IF YOU GET WEIRD STUFF, CAN'T BE HIGHER THAN 20000!
-    int start_pos = payload_length - 512; // start 512 back again
+    int payload_length = 512; 
+    memset(dma_grey_gpio_data, 0, payload_length * sizeof(ESP32_GREY_DMA_STORAGE_TYPE));
+
+    int start_pos = payload_length - (payload_length/2); 
     for (int i = 0; i < 3; i++) {
       dma_grey_gpio_data[start_pos++] = BIT_LAT;
     }

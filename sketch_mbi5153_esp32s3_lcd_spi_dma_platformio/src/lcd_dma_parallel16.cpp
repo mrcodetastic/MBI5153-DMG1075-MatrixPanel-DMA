@@ -120,32 +120,13 @@ esp_err_t Bus_Parallel16::setup_lcd_dma_periph(void) {
   //LCD_CAM.lcd_clock.lcd_clk_equ_sysclk = 0; // PCLK = CLK / (CLKCNT_N+1)
   LCD_CAM.lcd_clock.lcd_clk_equ_sysclk = 1;  // PCLK = CLK / 1 (... so 160Mhz still)
 
-  // divider of 18 = 8.888mhz
-  // divider of 16 = 10mhz
-  //auto  _div_num = 20; // DO NOT CHANGE! // 8Mhz
-  /*
-      auto  _div_num = 16; // DO NOT CHANGE! // 10Mhz
-
-      LCD_CAM.lcd_clock.lcd_clkm_div_num = _div_num;      
-      LCD_CAM.lcd_clock.lcd_clkm_div_b = 0;     // fractal clock divider numerator
-      LCD_CAM.lcd_clock.lcd_clkm_div_a = 1;     // denominator
-*/
-
-  /* 
-      The frequency of GCLK must be higher than 20% of DCLK to get the correct gray scale data. 
-      */
-
-  // Set the DCLK frequency. Refer to spi_dma_tx_loop.c for the GCLK.
-  // Don't change these unless you know what you are doing, and you probably don't!
-  //LCD_CAM.lcd_clock.lcd_clkm_div_num = 22;  // 7mhz  // Anything > 8Mhz seems to introduce noise when using jumper
-  //LCD_CAM.lcd_clock.lcd_clkm_div_num = 80;  // 2mhz
-  LCD_CAM.lcd_clock.lcd_clkm_div_num = 31;  // 7mhz  // Anything > 8Mhz seems to introduce noise when using jumper
+  LCD_CAM.lcd_clock.lcd_clkm_div_num = 32;  // 7mhz  // Anything > 8Mhz seems to introduce noise when using jumper
 
   LCD_CAM.lcd_clock.lcd_clkm_div_b = 0;  // fractal clock divider numerator
   LCD_CAM.lcd_clock.lcd_clkm_div_a = 1;  // denominator
 
-  ESP_LOGI("S3", "Clock divider is %d", (int)LCD_CAM.lcd_clock.lcd_clkm_div_num);
-  ESP_LOGD(TAG, "Resulting output clock frequency: %d Hz", (int)(160000000L / LCD_CAM.lcd_clock.lcd_clkm_div_num));
+  ESP_LOGD("S3", "Clock divider is %d", (int)LCD_CAM.lcd_clock.lcd_clkm_div_num);
+  ESP_LOGI(TAG, "Resulting LCD clock frequency: %d Hz", (int)(160000000L / LCD_CAM.lcd_clock.lcd_clkm_div_num));
 
   LCD_CAM.lcd_ctrl.lcd_rgb_mode_en = 0;     // i8080 mode (not RGB)
   LCD_CAM.lcd_rgb_yuv.lcd_conv_bypass = 0;  // Disable RGB/YUV converter

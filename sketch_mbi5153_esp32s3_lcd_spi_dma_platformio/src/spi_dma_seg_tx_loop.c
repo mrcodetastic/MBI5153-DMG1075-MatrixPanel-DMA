@@ -239,7 +239,7 @@ esp_err_t spi_setup(void)
   // Set the GCLK Frequency
   // Note: The frequency of GCLK must be higher than 20% of DCLK to get the correct gray scale data.  
   //device_conf.clock_speed_hz  = SPI_MASTER_FREQ_8M/2; // 4Mhz
-  device_conf.clock_speed_hz  = 13 * 1000 * 1000; // 3Mhz
+  device_conf.clock_speed_hz  = 10 * 1000 * 1000; // 3Mhz
   
   device_conf.duty_cycle_pos  = 0;
   device_conf.cs_ena_pretrans = device_conf.cs_ena_posttrans = 0;
