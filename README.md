@@ -3,7 +3,9 @@
 
 Uses PWM based chip that takes 16 bits sent serially for every pixel in the relevant colour chain. 
 
-There are 12 channels, as the panel is broken into 4 x RGB sections for each 1/4 of the panel (20 pixel in height each, for a total of 80px).
+There are 12 channels, as the panel is broken into 4 x RGB sections for each 1/4 of the panel (20 pixel in height each, for a total of 80px of which only 78 physical pixel actually exist).
+
+The code compensates for the 2 'ghost' pixels.
 
 Sketch default pin mapping is as follows:
 
