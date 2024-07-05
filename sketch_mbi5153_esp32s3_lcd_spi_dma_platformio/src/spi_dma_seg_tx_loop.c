@@ -239,7 +239,7 @@ esp_err_t spi_setup(void)
   // Set the GCLK Frequency
   // Note: The frequency of GCLK must be higher than 20% of DCLK to get the correct gray scale data.  
   //device_conf.clock_speed_hz  = SPI_MASTER_FREQ_8M/2; // 4Mhz
-  device_conf.clock_speed_hz  = 10 * 1000 * 1000; // 3Mhz
+  device_conf.clock_speed_hz  = 5 * 1000 * 1000; // 3Mhz
   
   device_conf.duty_cycle_pos  = 0;
   device_conf.cs_ena_pretrans = device_conf.cs_ena_posttrans = 0;
@@ -453,7 +453,13 @@ esp_err_t spi_transfer_loop_start()
   GPSPI2.dma_int_ena.dma_seg_trans_done = 1; // Doesn't work, so can't use it. :-(
   GPSPI2.dma_int_ena.trans_done = 1; // Doesn't work, so can't use it. :-(
 
-  GPSPI2.cmd.conf_bitlen = 0;
+  // Further Reduce time between segment loops. These registers are not changed by CONF.
+  GPSPI2.cmd.conf_bitlen = 0;         /*Define the APB cycles of  SPI_CONF state. Can be configured in CONF state.*/
+  GPSPI2.user.cs_setup = 0;           /*(cycles+1) of prepare phase by spi clock this bits are combined with spi_cs_setup bit. Can be configured in CONF state.*/
+  GPSPI2.user1.cs_setup_time = 0;     /*delay cycles of cs pin by spi clock this bits are combined with spi_cs_hold bit. Can be configured in CONF state.*/
+  GPSPI2.user1.cs_hold_time = 0;      /*delay cycles of cs pin by spi clock this bits are combined with spi_cs_hold bit. Can be configured in CONF state.*/
+  GPSPI2.user1.usr_addr_bitlen = 0;   /*The length in bits of address phase. The register value shall be (bit_num-1). Can be configured in CONF state.*/
+
 
   ret = esp_intr_free(intr_handle);
 

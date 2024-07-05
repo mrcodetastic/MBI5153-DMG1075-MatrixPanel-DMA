@@ -40,6 +40,8 @@ void setup(void)
 
   matrix.initMatrix();
 
+
+
 }
 
 float angle = 0.0f;
@@ -54,36 +56,46 @@ void loop()
 
   uint16_t cr, cg, cb;
 
-  for (int y = 0; y < PANEL_MBI_RES_Y; y++) {
-            for (int x = 0; x < PANEL_MBI_RES_X; x++) {
-                float dx = x - PANEL_MBI_RES_X / 2;
-                float dy = y - PANEL_MBI_RES_Y / 2;
-                float distance = sqrt(dx * dx + dy * dy);
-                float theta = atan2(dy, dx) + angle;
-                float hue = fmod((theta / (2 * PI)) + 1.0f, 1.0f);
-                hsvToRgb(hue, 1.0f, 1.0f,r,g,b);
-                matrix.drawPixel(x, y, r,g,b);
+  if ( frame_count < 5) {
 
-                if (y==46 & x == 39)
-                {
-                  cr = r; cb = b; cg = g;
-                }
+    for (int y = 0; y < PANEL_MBI_RES_Y; y++) {
+              for (int x = 0; x < PANEL_MBI_RES_X; x++) {
+                  float dx = x - PANEL_MBI_RES_X / 2;
+                  float dy = y - PANEL_MBI_RES_Y / 2;
+                  float distance = sqrt(dx * dx + dy * dy);
+                  float theta = atan2(dy, dx) + angle;
+                  float hue = fmod((theta / (2 * PI)) + 1.0f, 1.0f);
+                  hsvToRgb(hue, 1.0f, 1.0f,r,g,b);
+                  r = 255;
+                  b = 255;
+                  g = 255;
+                  matrix.drawPixel(x, y, r,g,b);
 
-            }
-   }
+                  if (y==46 & x == 39)
+                  {
+                    cr = r; cb = b; cg = g;
+                  }
 
-  matrix.fillCircleDMA(40, 40, 5, cr, cg, cb);   
+              }
+    }
 
-  if ((currentTime - lastTime) > 1000)
-  {
-    Serial.print("FPS: ");
-    Serial.println(frame_count, DEC);
-    
-    frame_count = 0;
-    lastTime = currentTime;
 
-  }   
+    matrix.fillCircleDMA(40, 40, 5, cr, cg, cb);   
 
-  matrix.update();
-  angle += 0.01f;
+    if ((currentTime - lastTime) > 1000)
+    {
+    //  Serial.print("FPS: ");
+    //  Serial.println(frame_count, DEC);
+      
+    // frame_count = 0;
+    //  lastTime = currentTime;
+
+    }   
+
+    matrix.update();
+    angle += 0.01f;
+
+
+  }
+
 }

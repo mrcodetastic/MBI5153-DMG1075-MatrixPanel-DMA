@@ -121,7 +121,7 @@ esp_err_t Bus_Parallel16::setup_lcd_dma_periph(void) {
   //LCD_CAM.lcd_clock.lcd_clk_equ_sysclk = 0; // PCLK = CLK / (CLKCNT_N+1)
   LCD_CAM.lcd_clock.lcd_clk_equ_sysclk = 1;  // PCLK = CLK / 1 (... so 160Mhz still)
 
-  LCD_CAM.lcd_clock.lcd_clkm_div_num = 32;  // 5mhz  // Anything > 8Mhz seems to introduce noise when using jumper
+  LCD_CAM.lcd_clock.lcd_clkm_div_num = 23;  // 7mhz  // Anything > 8Mhz seems to introduce noise when using jumper
 
   LCD_CAM.lcd_clock.lcd_clkm_div_b = 0;  // fractal clock divider numerator
   LCD_CAM.lcd_clock.lcd_clkm_div_a = 1;  // denominator
