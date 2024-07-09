@@ -1,3 +1,11 @@
+/******************************************************************************************
+ * @file        main.cpp
+ * @author      github.com/mrcodetastic
+ * @date        2024
+ * @brief       ESP32-S2 implementation for a MBI5135 PWM chip based LED Matrix Panel
+ ******************************************************************************************/
+
+
 /*
  * SPDX-FileCopyrightText: 2010-2022 Espressif Systems (Shanghai) CO LTD
  *

@@ -1,3 +1,10 @@
+/******************************************************************************************
+ * @file        spi_dma_seg_tx_loop.c
+ * @author      github.com/mrcodetastic
+ * @date        2024
+ * @brief       ESP32-S3 implementation for a MBI5135 PWM chip based LED Matrix Panel
+ ******************************************************************************************/
+
 /***************************************************************************************
    Abusing the ESP32S3's GPSPI2 for Continuous / Endless Transmit (TX) Loop of 
    Octal SPI (OSPI) output using configure-segmented transfer of < 32kB each segment.

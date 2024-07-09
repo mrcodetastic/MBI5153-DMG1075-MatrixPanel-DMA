@@ -1,3 +1,11 @@
+/******************************************************************************************
+ * @file        spi_dma_seg_tx_payload.c
+ * @author      github.com/mrcodetastic
+ * @date        2024
+ * @brief       ESP32-S3 implementation for a MBI5135 PWM chip based LED Matrix Panel
+ ******************************************************************************************/
+
+
 #pragma once
 
 /* Pre-generated manual GCLK and ADDR Line Toggling data. */

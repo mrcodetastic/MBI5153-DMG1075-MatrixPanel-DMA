@@ -1,3 +1,11 @@
+/******************************************************************************************
+ * @file        main.cpp
+ * @author      github.com/mrcodetastic
+ * @date        2024
+ * @brief       ESP32-S3 implementation for a MBI5135 PWM chip based LED Matrix Panel
+ ******************************************************************************************/
+
+
 #include <Matrix.h>
 #include <FastNoise.h>
 #include <array>

@@ -1,3 +1,11 @@
+/******************************************************************************************
+ * @file        app_constants.hpp
+ * @author      github.com/mrcodetastic
+ * @date        2024
+ * @brief       ESP32-S3 implementation for a MBI5135 PWM chip based LED Matrix Panel
+ ******************************************************************************************/
+
+
 #pragma once
 #include "hal/gpio_types.h"
 

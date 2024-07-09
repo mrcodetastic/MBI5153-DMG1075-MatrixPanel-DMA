@@ -1,3 +1,11 @@
+/******************************************************************************************
+ * @file        esp32s2_i2s_lcd_24bit_parallel_dma.cpp
+ * @author      github.com/mrcodetastic
+ * @date        2024
+ * @brief       ESP32-S2 implementation for a MBI5135 PWM chip based LED Matrix Panel
+ ******************************************************************************************/
+
+
 #include <sdkconfig.h>
 
 #if !defined (CONFIG_IDF_TARGET_ESP32S2)
