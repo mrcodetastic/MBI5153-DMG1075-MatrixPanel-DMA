@@ -13,8 +13,7 @@
 #if (ESP_IDF_VERSION_MAJOR == 5)
 #include <esp_private/periph_ctrl.h>
 #else
-// Break the compile 
-DO NOT COMPILE
+  #pragma error "ESP IDF >= 5 Required"
 #endif
 
 #include <soc/gpio_sig_map.h>
@@ -42,43 +41,29 @@ DO NOT COMPILE
 
 static const char *TAG = "i2s_24bit_lcd";
 
+#define ESP32_I2S_DEVICE I2S_NUM_0	
+
 /*************** Buffer Lengths ****************/
 
 // The length in parallel clocks. Actual memory use will be 3 x this.
-#define BUFF_BITLEN_VSYNC            240    // Half rate data bit length + some clocks for vsync
+#define BUFF_BITLEN_VSYNC            1000    // Half rate data bit length + some clocks for vsync
 
 // Double the time as we don't have enough to send colour data in the time it takes to iterate through all the rows and stimulate LEDs + some clocks for vsync
-#define BUFF_BITLEN_GCLK_CDATA       ((20520*2)+1000)
-#define BUFF_BITLEN_CONFIG           (200)   // Config stuff
+#define BUFF_BITLEN_GCLK_CDATA       ((20520*2)+BUFF_BITLEN_VSYNC)
+#define BUFF_BITLEN_CONFIG           (500)   // Config stuff
 
 /******************* Externs  ******************/
 DMA_DATA_TYPE *global_buffer_gclk_cdata   = NULL; // data for gclk + new payload of MBI serial colour data + vsync
-DMA_DATA_TYPE *global_buffer_vsync        = NULL;
-DMA_DATA_TYPE *global_buffer_vsync_tmp    = NULL;
 DMA_DATA_TYPE *global_buffer_configuration      = NULL; // for sending any other data
 
-static int gclk_cdata_last_dma_ll_desc_pos = 0;
 lldesc_t *dma_ll_gclk_cdata = NULL;
-lldesc_t *dma_ll_vsync = NULL;
 lldesc_t *dma_ll_configuration = NULL;
 
 /******************* ******  *******************/
-  //static volatile bool dma_buffer_sent = false;
-  static volatile int  interrupt_count = 0;
-
-/******************* ******  *******************/
-    #define ESP32_I2S_DEVICE I2S_NUM_0	
-
-    esp_err_t mbi_start_output_loop();
-
-    // Static
-    i2s_dev_t* getDev()
-    {
-        return &I2S0;
-    }
-
 volatile bool dma_buffer_sent = false;
-/******************* ******  *******************/
+static volatile int  interrupt_count = 0;
+
+/*
     static void IRAM_ATTR i2s_dma_isr(void* arg) {
 
       interrupt_count = interrupt_count + 1;
@@ -91,11 +76,16 @@ volatile bool dma_buffer_sent = false;
       dma_buffer_sent = true;
 
     }
-
+*/
     int get_interrupt_count(){
       return interrupt_count;
     }
 
+    /*************************************************************************************/
+    i2s_dev_t* getDev()
+    {
+        return &I2S0;
+    }
 
     void _mbl_set_latch_for_config_buff(int latch_length, int &start_pos, bool stay_low = false) {
 
@@ -273,7 +263,7 @@ volatile bool dma_buffer_sent = false;
 
     esp_err_t i2s_lcd_mode_setup() // The big one that gets everything setup.
     {
-      esp_err_t ret;
+      esp_err_t ret = ESP_OK;
 
         // START: CONFIGURATION
         config_t _cfg;
@@ -317,13 +307,13 @@ volatile bool dma_buffer_sent = false;
         auto dev = getDev();
         volatile int iomux_signal_base;
         volatile int iomux_clock;
-        int irq_source;
+       // int irq_source;
 
         periph_module_reset(PERIPH_I2S0_MODULE);
         periph_module_enable(PERIPH_I2S0_MODULE);
 
         iomux_clock = I2S0O_WS_OUT_IDX;
-        irq_source = ETS_I2S0_INTR_SOURCE;
+        //irq_source = ETS_I2S0_INTR_SOURCE;
 
         if ( _cfg.parallel_width == 24)
         {
@@ -423,13 +413,13 @@ volatile bool dma_buffer_sent = false;
         dev->fifo_conf.tx_24msb_en = 0;
 
         //dev->int_ena.out_done = 1;
-        dev->int_ena.out_eof  = 1;
+        //dev->int_ena.out_eof  = 1; // no use for this. No implementation works which is of use.
 
         // Setup I2S Interrupt
         //SET_PERI_REG_BITS(I2S_INT_ENA_REG(I2S_NUM_0), I2S_OUT_EOF_INT_ENA_V, 1, I2S_OUT_EOF_INT_ENA_S);
 
         // Allocate a level 1 intterupt: lowest priority, as ISR isn't urgent and may take a long time to complete
-        ret = esp_intr_alloc(irq_source, (int)(ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_LEVEL1), i2s_dma_isr, NULL, NULL);
+        // ret = esp_intr_alloc(irq_source, (int)(ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_LEVEL1), i2s_dma_isr, NULL, NULL);
       
         return ret;
       }
@@ -437,41 +427,6 @@ volatile bool dma_buffer_sent = false;
     esp_err_t i2s_dma_buff_allocate()
     {
 
-        //
-        // Allocate Vsync Buffer
-        //
-        {
-          size_t alloc_size_bytes  = BUFF_BITLEN_VSYNC * sizeof(DMA_DATA_TYPE); // Up to 44,000  pulses of 24 bits in parallel.
-
-          ESP_LOGI(TAG, "Allocating internal SRAM DMA memory for global_buffer_vsync.");  
-          global_buffer_vsync = static_cast<DMA_DATA_TYPE *>(heap_caps_malloc(alloc_size_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
-          assert(global_buffer_vsync != nullptr);
-
-          // Zero out
-          memset(global_buffer_vsync, 0, alloc_size_bytes); // zero it. 
-
-          // dma ll desc
-          int dma_node_cnt = ll_desc_get_required_num(alloc_size_bytes); // it will always be 1 or zero!
-          dma_ll_vsync =  allocate_dma_descriptors_gb(dma_node_cnt, alloc_size_bytes, global_buffer_vsync, false);
-
-          // Temp
-          global_buffer_vsync_tmp = static_cast<DMA_DATA_TYPE *>(heap_caps_malloc(alloc_size_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
-          assert(global_buffer_vsync_tmp != nullptr);
-          memset(global_buffer_vsync_tmp, 0, alloc_size_bytes); // zero it.           
-
-          // Set lat values
-          const int start_pos = BUFF_BITLEN_VSYNC/2;
-          for (int i = 0; i < 3; ++i) {
-               global_buffer_vsync_tmp[start_pos + i].lat = 1;
-               global_buffer_vsync_tmp[start_pos + i].notused4 = 1;
-          }
-                      
-        } // end block
-
-
-
- 
-        /**********************************************************************************/
         // Allocate the buffer for new greyscale data, at the same time as sending out gclks,
         // and finishing off with a vsync.
         {
@@ -506,27 +461,14 @@ volatile bool dma_buffer_sent = false;
 
           // dma ll desc
           int dma_node_cnt = ll_desc_get_required_num(alloc_size_bytes); 
-          dma_ll_gclk_cdata =  allocate_dma_descriptors_gb(dma_node_cnt, alloc_size_bytes, global_buffer_gclk_cdata, false);
+          dma_ll_gclk_cdata =  allocate_dma_descriptors_gb(dma_node_cnt, alloc_size_bytes, global_buffer_gclk_cdata, true);
 
-          // Last linked list item for this buffer points to global_buffer_gclk_only!! Only one way 
-          gclk_cdata_last_dma_ll_desc_pos = dma_node_cnt-1;
-
-
-
-          // DMA LL updates
-          dma_ll_gclk_cdata[gclk_cdata_last_dma_ll_desc_pos].empty  = (uintptr_t) &dma_ll_vsync[0];
-          dma_ll_vsync[0].empty                                     = (uintptr_t) &dma_ll_gclk_cdata[0];
-          dma_ll_vsync[0].eof = 1; // trigger eof only time this should happen                    
-
-/*
           // Populate with vsync data
           int start_pos = BUFF_BITLEN_GCLK_CDATA-500;
           int latch_length = 3; 
           for (int i = latch_length; i > 0; i--) {        
             global_buffer_gclk_cdata[start_pos++].lat = 1;                      
           }
-*/
-
         } // end gclk
 
 
@@ -697,31 +639,6 @@ volatile bool dma_buffer_sent = false;
     } // end 
 
 
-  esp_err_t mbi_send_vsync()
-    {
-      auto dev = getDev();
-
-      // Configure DMA burst mode
-      dev->lc_conf.val = I2S_OUT_DATA_BURST_EN | I2S_OUTDSCR_BURST_EN;
-     
-
-      while (!dev->state.tx_idle);
-      dev->conf.tx_start = 0;
-      dev->conf.tx_reset = 1;
-      dev->conf.tx_reset = 0;
-      dev->conf.tx_fifo_reset = 1;
-      dev->conf.tx_fifo_reset = 0;
-
-      // ensure to link to the dma_ll var!!
-      dev->out_link.addr = ((uint32_t)&dma_ll_vsync[0]) & 0xfffff;
-      dev->out_link.start = 1;
-      ets_delay_us(1);
-      dev->conf.tx_start = 1;
-
-      return ESP_OK;
-
-    } // end     
-
     esp_err_t mbi_start_output_loop()
     {
       auto dev = getDev();
@@ -758,7 +675,60 @@ volatile bool dma_buffer_sent = false;
         }
     }
 
-    void mbi_set_pixel(uint8_t x, uint8_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data) {
+    IRAM_ATTR void mbi_set_pixel(uint8_t x, uint8_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data) {
+
+        if (x >= PANEL_PHY_RES_X || y >= PANEL_PHY_RES_Y) {
+            return;
+        }
+
+        x += 2;
+
+        int y_normalised = y % PANEL_SCAN_LINES;
+        int bit_start_pos = (1280 * y_normalised) + ((x % 16) * 80) + ((x / 16) * 16);
+        int rgb_channel = (y / PANEL_SCAN_LINES);
+
+        uint8_t mask;
+
+      /*
+        MBI5153 provides a selectable 14-bit or 13-bit gray scale by setting the configuration register1 bit [7]. The default 
+        value is set to ’0’ for 14-bit color depth. In 14-bit gray scale mode, users should still send 16-bit data with 2-bit ‘0’ in 
+        LSB bits. For example, {14’h1234, 2’h0}. 
+
+        RGB colour data provided is only 8bits, so we'll fill it from bit 16 down to bit 8
+      */    
+        for (int subpixel_colour_bit = 7; subpixel_colour_bit >= 0; --subpixel_colour_bit) {
+            mask = 1 << subpixel_colour_bit;
+            switch (rgb_channel) {
+                case 0:
+                    global_buffer_gclk_cdata[bit_start_pos].r1 = (mask & r_data) ? 1 : 0;
+                    global_buffer_gclk_cdata[bit_start_pos].g1 = (mask & g_data) ? 1 : 0;
+                    global_buffer_gclk_cdata[bit_start_pos].b1 = (mask & b_data) ? 1 : 0;
+                    break;
+                case 1:
+                    global_buffer_gclk_cdata[bit_start_pos].r2 = (mask & r_data) ? 1 : 0;
+                    global_buffer_gclk_cdata[bit_start_pos].g2 = (mask & g_data) ? 1 : 0;
+                    global_buffer_gclk_cdata[bit_start_pos].b2 = (mask & b_data) ? 1 : 0;
+                    break;
+                case 2:
+                    global_buffer_gclk_cdata[bit_start_pos].r3 = (mask & r_data) ? 1 : 0;
+                    global_buffer_gclk_cdata[bit_start_pos].g3 = (mask & g_data) ? 1 : 0;
+                    global_buffer_gclk_cdata[bit_start_pos].b3 = (mask & b_data) ? 1 : 0;
+                    break;
+                case 3:
+                    global_buffer_gclk_cdata[bit_start_pos].r4 = (mask & r_data) ? 1 : 0;
+                    global_buffer_gclk_cdata[bit_start_pos].g4 = (mask & g_data) ? 1 : 0;
+                    global_buffer_gclk_cdata[bit_start_pos].b4 = (mask & b_data) ? 1 : 0;
+                    break;
+            }
+            bit_start_pos++;
+        }
+
+        #ifdef USE_PSRAM
+            Cache_WriteBack_Addr((uint32_t)pixel, sizeof(PixelData) * 8);
+        #endif
+    }
+
+    void mbi_set_pixel_old(uint8_t x, uint8_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data) {
 
       if (x >= PANEL_PHY_RES_X || y >= PANEL_PHY_RES_Y) {
         return;
@@ -855,36 +825,11 @@ volatile bool dma_buffer_sent = false;
 
     }  // mbi_set_pixel  
 
-
-
-    // Doesn't work very well. Very dirty. No fix seemingly.
-    IRAM_ATTR void mbi_update()
+    void mbi_update()
     {
+        // Do nothing as vsync is permanently on 
 
-        dma_buffer_sent = false;
-        while (!dma_buffer_sent);
-        dma_buffer_sent = false;
-        while (!dma_buffer_sent);
-        dma_buffer_sent = false;
-        while (!dma_buffer_sent);
-
-        // Set lat values
-        memcpy(global_buffer_vsync, global_buffer_vsync_tmp, BUFF_BITLEN_VSYNC * sizeof(DMA_DATA_TYPE));
-
-        dma_buffer_sent = false;
-        while (!dma_buffer_sent);
-        dma_buffer_sent = false;
-        while (!dma_buffer_sent);
-        dma_buffer_sent = false;
-        while (!dma_buffer_sent);
-
-        memset(global_buffer_vsync,0, BUFF_BITLEN_VSYNC * sizeof(DMA_DATA_TYPE));
-        
-        dma_buffer_sent = false;
-        while (!dma_buffer_sent);
-
-    } // end   
-  
+    }
 
     // Do it all
     esp_err_t mbi_start()

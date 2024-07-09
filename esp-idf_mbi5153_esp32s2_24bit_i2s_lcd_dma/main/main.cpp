@@ -52,9 +52,9 @@ void output_task(void *arg) {
 
       blink_led();
       printf("Free internal SRAM heap available: %zu bytes\n", heap_caps_get_free_size( MALLOC_CAP_INTERNAL ));
-      printf("I2S DMA out_eof interrupt count is: %d\n", get_interrupt_count());
+      //printf("I2S DMA out_eof interrupt count is: %d\n", get_interrupt_count());
 
-      for (int i = 5; i >= 0; i--) { // wait 5 seconds
+      for (int i = 4; i >= 0; i--) { // wait 5 seconds
           vTaskDelay(1000 / portTICK_PERIOD_MS);
       }
       fflush(stdout);
@@ -122,7 +122,7 @@ void graphics_task(void *arg) {
     }
 
     mbi_update();
-    mbi_clear();       
+    //mbi_clear(); // as this is a fullscreen reload, no need to clear
 
     angle += 0.1f;
   } // while
@@ -242,12 +242,8 @@ void draw_wireframe(void)
 void spinning_cube_task(void *arg) {
 
     while (1) {
-
-
+      
       currentTime = millis();
-
-      frame_count++;    
-
 
       if ((currentTime - lastTime) > 1000)
       {
@@ -286,9 +282,11 @@ void spinning_cube_task(void *arg) {
           draw_vertices();
        }
 
+
+        frame_count++;    
         draw_wireframe();
         mbi_update();
-        vTaskDelay(1000 / portTICK_PERIOD_MS);              
+        vTaskDelay(20 / portTICK_PERIOD_MS);              
         mbi_clear();        
     } // draw wireframe     
        
