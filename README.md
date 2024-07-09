@@ -10,4 +10,5 @@ The code compensates for the 2 'ghost' pixels.
 ## Software / Hardware implementations.
 There are two hardware implementations for this LED panel, as one implementation isn't enough for me. As these two Espressif MCU’s have different capabilities and constraints, the implementations are different. The ESP32-S3 is the best device to use of the two implementations.
 
-![image](https://github.com/mrcodetastic/ESP32S3-MBI5153-DMG1075-DMA/assets/12006953/4d9d8386-97a9-40ae-8fc5-589d130c8b61)
+![image](https://github.com/mrcodetastic/ESP32S3-MBI5153-DMG1075-DMA/assets/12006953/bde121d3-7b42-4a5c-b2f1-9da7fdccd7a4)
+
