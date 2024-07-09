@@ -124,8 +124,7 @@ void graphics_task(void *arg) {
     mbi_update();
     mbi_clear();       
 
-   // mbi_update_v2();
-    angle += 0.01f;
+    angle += 0.1f;
   } // while
 
 
@@ -334,8 +333,8 @@ extern "C" void app_main(void)
 
 
     ESP_LOGI("app_main", "Creating graphics task.");        
-    xTaskCreate(graphics_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
-    //xTaskCreate(spinning_cube_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
+    //xTaskCreate(graphics_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
+    xTaskCreate(spinning_cube_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
 
 
 

@@ -45,7 +45,7 @@ static const char *TAG = "i2s_24bit_lcd";
 /*************** Buffer Lengths ****************/
 
 // The length in parallel clocks. Actual memory use will be 3 x this.
-#define BUFF_BITLEN_VSYNC             500    // Half rate data bit length + some clocks for vsync
+#define BUFF_BITLEN_VSYNC            240    // Half rate data bit length + some clocks for vsync
 
 // Double the time as we don't have enough to send colour data in the time it takes to iterate through all the rows and stimulate LEDs + some clocks for vsync
 #define BUFF_BITLEN_GCLK_CDATA       ((20520*2)+1000)
@@ -54,6 +54,7 @@ static const char *TAG = "i2s_24bit_lcd";
 /******************* Externs  ******************/
 DMA_DATA_TYPE *global_buffer_gclk_cdata   = NULL; // data for gclk + new payload of MBI serial colour data + vsync
 DMA_DATA_TYPE *global_buffer_vsync        = NULL;
+DMA_DATA_TYPE *global_buffer_vsync_tmp    = NULL;
 DMA_DATA_TYPE *global_buffer_configuration      = NULL; // for sending any other data
 
 static int gclk_cdata_last_dma_ll_desc_pos = 0;
@@ -62,7 +63,7 @@ lldesc_t *dma_ll_vsync = NULL;
 lldesc_t *dma_ll_configuration = NULL;
 
 /******************* ******  *******************/
-  static volatile bool dma_buffer_sent = false;
+  //static volatile bool dma_buffer_sent = false;
   static volatile int  interrupt_count = 0;
 
 /******************* ******  *******************/
@@ -76,14 +77,11 @@ lldesc_t *dma_ll_configuration = NULL;
         return &I2S0;
     }
 
-
+volatile bool dma_buffer_sent = false;
 /******************* ******  *******************/
     static void IRAM_ATTR i2s_dma_isr(void* arg) {
 
       interrupt_count = interrupt_count + 1;
-
-      // set the greyscale / gclk to loop back on itself again please
-      dma_ll_gclk_cdata[gclk_cdata_last_dma_ll_desc_pos].empty = (uintptr_t)&dma_ll_gclk_cdata[0]; // loop greyscale back on itself in the interrupt.   
 
       // Clear flag so we can get retriggered
       SET_PERI_REG_BITS(I2S_INT_CLR_REG(I2S_NUM_0), I2S_OUT_EOF_INT_CLR_V,  1, I2S_OUT_EOF_INT_CLR_S);                      
@@ -91,6 +89,7 @@ lldesc_t *dma_ll_configuration = NULL;
       
       // at this point, the previously active buffer is free, go ahead and write to it
       dma_buffer_sent = true;
+
     }
 
     int get_interrupt_count(){
@@ -311,7 +310,7 @@ lldesc_t *dma_ll_configuration = NULL;
         _cfg.pin_d20 = MBI_G4_PIN;      
         _cfg.pin_d21 = MBI_B4_PIN;        
         _cfg.pin_d22 = -1;          
-        _cfg.pin_d23 = -1;  // end of third byte
+        _cfg.pin_d23 = DEBUG_PIN;  // end of third byte
 
         // END CONFIGURATION
               
@@ -437,6 +436,40 @@ lldesc_t *dma_ll_configuration = NULL;
 
     esp_err_t i2s_dma_buff_allocate()
     {
+
+        //
+        // Allocate Vsync Buffer
+        //
+        {
+          size_t alloc_size_bytes  = BUFF_BITLEN_VSYNC * sizeof(DMA_DATA_TYPE); // Up to 44,000  pulses of 24 bits in parallel.
+
+          ESP_LOGI(TAG, "Allocating internal SRAM DMA memory for global_buffer_vsync.");  
+          global_buffer_vsync = static_cast<DMA_DATA_TYPE *>(heap_caps_malloc(alloc_size_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
+          assert(global_buffer_vsync != nullptr);
+
+          // Zero out
+          memset(global_buffer_vsync, 0, alloc_size_bytes); // zero it. 
+
+          // dma ll desc
+          int dma_node_cnt = ll_desc_get_required_num(alloc_size_bytes); // it will always be 1 or zero!
+          dma_ll_vsync =  allocate_dma_descriptors_gb(dma_node_cnt, alloc_size_bytes, global_buffer_vsync, false);
+
+          // Temp
+          global_buffer_vsync_tmp = static_cast<DMA_DATA_TYPE *>(heap_caps_malloc(alloc_size_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
+          assert(global_buffer_vsync_tmp != nullptr);
+          memset(global_buffer_vsync_tmp, 0, alloc_size_bytes); // zero it.           
+
+          // Set lat values
+          const int start_pos = BUFF_BITLEN_VSYNC/2;
+          for (int i = 0; i < 3; ++i) {
+               global_buffer_vsync_tmp[start_pos + i].lat = 1;
+               global_buffer_vsync_tmp[start_pos + i].notused4 = 1;
+          }
+                      
+        } // end block
+
+
+
  
         /**********************************************************************************/
         // Allocate the buffer for new greyscale data, at the same time as sending out gclks,
@@ -451,7 +484,7 @@ lldesc_t *dma_ll_configuration = NULL;
           assert(err == ESP_OK);
 #else
           ESP_LOGI(TAG, "Allocating internal SRAM DMA memory for global_buffer_gclk_cdata.");  
-          global_buffer_gclk_cdata = (DMA_DATA_TYPE *)heap_caps_malloc(alloc_size_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+          global_buffer_gclk_cdata = static_cast<DMA_DATA_TYPE *>(heap_caps_malloc(alloc_size_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
           assert(global_buffer_gclk_cdata != nullptr);
 #endif
 
@@ -473,51 +506,29 @@ lldesc_t *dma_ll_configuration = NULL;
 
           // dma ll desc
           int dma_node_cnt = ll_desc_get_required_num(alloc_size_bytes); 
-          dma_ll_gclk_cdata =  allocate_dma_descriptors_gb(dma_node_cnt, alloc_size_bytes, global_buffer_gclk_cdata, true);
+          dma_ll_gclk_cdata =  allocate_dma_descriptors_gb(dma_node_cnt, alloc_size_bytes, global_buffer_gclk_cdata, false);
 
           // Last linked list item for this buffer points to global_buffer_gclk_only!! Only one way 
           gclk_cdata_last_dma_ll_desc_pos = dma_node_cnt-1;
 
-          // Populate with data
+
+
+          // DMA LL updates
+          dma_ll_gclk_cdata[gclk_cdata_last_dma_ll_desc_pos].empty  = (uintptr_t) &dma_ll_vsync[0];
+          dma_ll_vsync[0].empty                                     = (uintptr_t) &dma_ll_gclk_cdata[0];
+          dma_ll_vsync[0].eof = 1; // trigger eof only time this should happen                    
+
+/*
+          // Populate with vsync data
           int start_pos = BUFF_BITLEN_GCLK_CDATA-500;
           int latch_length = 3; 
           for (int i = latch_length; i > 0; i--) {        
             global_buffer_gclk_cdata[start_pos++].lat = 1;                      
           }
-
-
-
-        }
-
-        //
-        // Allocate Vsync Buffer
-        //
-        {
-          size_t alloc_size_bytes  = BUFF_BITLEN_VSYNC * sizeof(DMA_DATA_TYPE); // Up to 44,000  pulses of 24 bits in parallel.
-
-          ESP_LOGI(TAG, "Allocating internal SRAM DMA memory for global_buffer_gclk_cdata.");  
-          global_buffer_vsync = (DMA_DATA_TYPE *)heap_caps_malloc(alloc_size_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
-          assert(global_buffer_vsync != nullptr);
-
-          // Zero out
-          memset(global_buffer_vsync, 0, alloc_size_bytes); // zero it. 
-
-          // dma ll desc
-          int dma_node_cnt = ll_desc_get_required_num(alloc_size_bytes); // it will always be 1 or zero!
-          dma_ll_vsync =  allocate_dma_descriptors_gb(dma_node_cnt, alloc_size_bytes, global_buffer_vsync);
-          dma_ll_vsync[0].eof = 1; // trigger eof only time this should happen
-
-/*
-          // Populate with data
-          int start_pos = BUFF_BITLEN_VSYNC/2;
-          int latch_length = 3; 
-          for (int i = latch_length; i > 0; i--) {        
-            global_buffer_vsync[start_pos++].lat = 1;                      
-          }
-
 */
 
-        }
+        } // end gclk
+
 
         // Allocate the buffer for command and other crap
         {
@@ -530,7 +541,7 @@ lldesc_t *dma_ll_configuration = NULL;
           assert(err == ESP_OK);
 #else
           ESP_LOGI(TAG, "Allocating internal SRAM DMA memory for global_buffer_configuration.");  
-          global_buffer_configuration = (DMA_DATA_TYPE *)heap_caps_malloc(alloc_size_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+          global_buffer_configuration = static_cast<DMA_DATA_TYPE *>(heap_caps_malloc(alloc_size_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
           assert(global_buffer_configuration != nullptr);
 #endif
           size_t alignment_offset = actual_size - alloc_size_bytes;      
@@ -577,7 +588,6 @@ lldesc_t *dma_ll_configuration = NULL;
               }
 
               // Part 2, the greyscale data latches in the right spot. Assume greyscale data will start from postion 0 in this buffer.
-              {
               int counter = 0;
               for (int row = 0; row < PANEL_SCAN_LINES; row++) { // rows
                 for (int chan = 0; chan < PANEL_MBI_LED_CHANS; chan++) { // channels per chip
@@ -607,8 +617,6 @@ lldesc_t *dma_ll_configuration = NULL;
                   }
                 }
               } // end latch config for greyscale data      
-              }      
-
         } //end block 1
 
         // Load configuration / Start-up Data
@@ -748,7 +756,6 @@ lldesc_t *dma_ll_configuration = NULL;
           // if we use PSRAM need to add that cache writeback bullshite here.
           // PSRAM on S2 sucks ballz so not going to bother.
         }
-
     }
 
     void mbi_set_pixel(uint8_t x, uint8_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data) {
@@ -849,50 +856,35 @@ lldesc_t *dma_ll_configuration = NULL;
     }  // mbi_set_pixel  
 
 
-/*
+
+    // Doesn't work very well. Very dirty. No fix seemingly.
     IRAM_ATTR void mbi_update()
     {
 
-      dma_buffer_sent = false;
+        dma_buffer_sent = false;
+        while (!dma_buffer_sent);
+        dma_buffer_sent = false;
+        while (!dma_buffer_sent);
+        dma_buffer_sent = false;
+        while (!dma_buffer_sent);
 
-      // set vsync to point back to greyscale buffer before we begin
-      dma_ll_vsync[0].empty = (uintptr_t)&dma_ll_gclk_cdata[0]; // back to output data
+        // Set lat values
+        memcpy(global_buffer_vsync, global_buffer_vsync_tmp, BUFF_BITLEN_VSYNC * sizeof(DMA_DATA_TYPE));
 
-      // set end of greyscale / gclk buffer to point to start of vsync 
-      dma_ll_gclk_cdata[gclk_cdata_last_dma_ll_desc_pos].empty = (uintptr_t)&dma_ll_vsync[0]; // back to output data
+        dma_buffer_sent = false;
+        while (!dma_buffer_sent);
+        dma_buffer_sent = false;
+        while (!dma_buffer_sent);
+        dma_buffer_sent = false;
+        while (!dma_buffer_sent);
 
-      while (!dma_buffer_sent);
-
-      // When the interrupt triggers that the vsync occured, set it so the greyscale buffer loops on itself
-      // until such time a vsync is required again.
-      // This is done within the interrupt service routine
+        memset(global_buffer_vsync,0, BUFF_BITLEN_VSYNC * sizeof(DMA_DATA_TYPE));
+        
+        dma_buffer_sent = false;
+        while (!dma_buffer_sent);
 
     } // end   
-    */ 
-
-    IRAM_ATTR void mbi_update()
-    {
-
-
-      // Can't get it to work, vsync always happening now...
-
-/*
-      dma_buffer_sent = false;
-
-      // set vsync to point back to greyscale buffer before we begin
-      dma_ll_vsync[0].empty = (uintptr_t)&dma_ll_gclk_cdata[0]; // back to output data
-
-      // set end of greyscale / gclk buffer to point to start of vsync 
-      dma_ll_gclk_cdata[gclk_cdata_last_dma_ll_desc_pos].empty = (uintptr_t)&dma_ll_vsync[0]; // back to output data
-
-      while (!dma_buffer_sent);
-
-      // When the interrupt triggers that the vsync occured, set it so the greyscale buffer loops on itself
-      // until such time a vsync is required again.
-      // This is done within the interrupt service routine
-*/
-
-    } // end     
+  
 
     // Do it all
     esp_err_t mbi_start()

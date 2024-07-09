@@ -42,7 +42,7 @@
   #define MBI_R4_PIN              GPIO_NUM_7  
 
   // Debug
-  #define DEBUG_PIN               GPIO_NUM_14   
+  #define DEBUG_PIN               GPIO_NUM_13   
 
 #elif (GPIO_MAPPING == GPIO_MAPPING_OTHER)  
 
