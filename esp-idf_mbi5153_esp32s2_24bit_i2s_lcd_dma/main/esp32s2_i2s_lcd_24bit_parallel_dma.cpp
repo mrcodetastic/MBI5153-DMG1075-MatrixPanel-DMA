@@ -57,7 +57,7 @@ static const char *TAG = "i2s_24bit_lcd";
 #define BUFF_BITLEN_VSYNC            1000    // Half rate data bit length + some clocks for vsync
 
 // Double the time as we don't have enough to send colour data in the time it takes to iterate through all the rows and stimulate LEDs + some clocks for vsync
-#define BUFF_BITLEN_GCLK_CDATA       ((20520*2)+BUFF_BITLEN_VSYNC)
+#define BUFF_BITLEN_GCLK_CDATA       ((20520*2))
 #define BUFF_BITLEN_CONFIG           (500)   // Config stuff
 
 /******************* Externs  ******************/
@@ -438,7 +438,7 @@ static volatile int  interrupt_count = 0;
         // Allocate the buffer for new greyscale data, at the same time as sending out gclks,
         // and finishing off with a vsync.
         {
-          size_t alloc_size_bytes  = BUFF_BITLEN_GCLK_CDATA * sizeof(DMA_DATA_TYPE); // Up to 44,000  pulses of 24 bits in parallel.
+          size_t alloc_size_bytes  = (BUFF_BITLEN_GCLK_CDATA+BUFF_BITLEN_VSYNC) * sizeof(DMA_DATA_TYPE); // Up to 44,000  pulses of 24 bits in parallel.
           size_t actual_size = 0;
 
 #ifdef USE_PSRAM
@@ -472,7 +472,7 @@ static volatile int  interrupt_count = 0;
           dma_ll_gclk_cdata =  allocate_dma_descriptors_gb(dma_node_cnt, alloc_size_bytes, global_buffer_gclk_cdata, true);
 
           // Populate with vsync data
-          int start_pos = BUFF_BITLEN_GCLK_CDATA-500;
+          int start_pos = BUFF_BITLEN_GCLK_CDATA+(BUFF_BITLEN_VSYNC/2);
           int latch_length = 3; 
           for (int i = latch_length; i > 0; i--) {        
             global_buffer_gclk_cdata[start_pos++].lat = 1;                      
@@ -673,7 +673,8 @@ static volatile int  interrupt_count = 0;
 
     void mbi_clear()
     {
-        for (int i = 0; i< BUFF_BITLEN_GCLK_CDATA; i++) {
+        // Iterate only for length of greyscale data bitlength.
+        for (int i = 0; i< BUFF_BITLEN_GCLK_CDATA; i++) { 
 
           global_buffer_gclk_cdata[i].byte1 = 0; 
           global_buffer_gclk_cdata[i].byte2 = 0; 
