@@ -7,6 +7,8 @@ There are 12 channels, as the panel is broken into 4 x RGB sections for each 1/4
 
 The code compensates for the 2 'ghost' pixels.
 
+More info on the panels here: https://led.limehouselabs.org/docs/tiles/dmg1083/
+
 ## Software and Hardware implementation(s)
 There are two hardware implementations for this LED panel, as one implementation isn't enough for me. As these two Espressif MCU’s have different capabilities and constraints, the software implementations are different. 
 
