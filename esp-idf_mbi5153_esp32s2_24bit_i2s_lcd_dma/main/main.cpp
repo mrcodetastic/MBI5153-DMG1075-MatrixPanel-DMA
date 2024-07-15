@@ -303,8 +303,62 @@ void spinning_cube_task(void *arg) {
 
 } // end cube task
 
-/********************************************************************/
 
+/************************************************************************/
+void rgb_loop_task(void *arg) {
+
+    static int rgb_mode = 0;
+
+    while (1) {
+      
+      currentTime = millis();
+
+      if ((currentTime - lastTime) > 1000)
+      {
+          printf("Frame Rate is: %d\n", frame_count);
+
+          frame_count = 0;
+          lastTime = currentTime;
+
+      }       
+
+      int r = 0;
+      int g = 0;
+      int b = 0;
+      if (rgb_mode == 0 )
+      {
+        r = 255;
+        rgb_mode++;        
+      }
+      else if (rgb_mode == 1)
+      {
+        g = 255;
+        rgb_mode++;        
+      }
+      else if (rgb_mode == 2)
+      {
+        b = 255;
+        rgb_mode = 0;
+      }
+
+
+
+      for (int y = 0; y < PANEL_MBI_RES_Y; y++) {
+              for (int x = 0; x < PANEL_MBI_RES_X; x++) {                
+                  mbi_set_pixel(x, y, r,g,b);
+              }
+          }
+
+        mbi_update();
+        vTaskDelay(1000 / portTICK_PERIOD_MS);              
+        mbi_clear();  
+
+    } // draw wireframe     
+       
+} // end cube task
+
+
+/************************************************************************/
 
 extern "C" void app_main(void)
 {
@@ -316,7 +370,7 @@ extern "C" void app_main(void)
 
     blink_led();    
 
-    for (int delaysec = 3; delaysec > 0; delaysec--)
+    for (int delaysec = 2; delaysec > 0; delaysec--)
     {
       vTaskDelay(1000 / portTICK_PERIOD_MS);
       ESP_LOGI("app_main", "Starting in %d...", delaysec);
@@ -340,7 +394,9 @@ extern "C" void app_main(void)
 
     ESP_LOGI("app_main", "Creating graphics task.");        
     //xTaskCreate(graphics_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
-    xTaskCreate(spinning_cube_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
+    //xTaskCreate(spinning_cube_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
+
+    xTaskCreate(rgb_loop_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
 
 
 
