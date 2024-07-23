@@ -483,6 +483,25 @@ class Matrix : public GFX {
     }
   }
 
+
+  void drawPixel(int16_t x, int16_t y, CRGB color)
+  {
+    mbi_set_pixel(x, y, color.red, color.green, color.blue);
+  }
+
+  // includes 565 to 888 conversion
+  void drawPixel(int16_t x, int16_t y, uint16_t color)
+  {
+    uint8_t r   = (color >> 8) & 0xf8;
+    uint8_t  g  = (color >> 3) & 0xfc;
+    uint8_t b   = (color << 3);
+    r |= r >> 5;
+    g |= g >> 6;
+    b |= b >> 5;    
+    mbi_set_pixel(x, y, r, g, b);
+  }
+
+
  protected:
 
   bool initialized = false;
@@ -607,26 +626,6 @@ class Matrix : public GFX {
         
  
   }  // mbi_set_pixel
-
-
-  void drawPixel(int16_t x, int16_t y, CRGB color)
-  {
-    mbi_set_pixel(x, y, color.red, color.green, color.blue);
-  }
-
-  // includes 565 to 888 conversion
-  void drawPixel(int16_t x, int16_t y, uint16_t color)
-  {
-    uint8_t r   = (color >> 8) & 0xf8;
-    uint8_t  g  = (color >> 3) & 0xfc;
-    uint8_t b   = (color << 3);
-    r |= r >> 5;
-    g |= g >> 6;
-    b |= b >> 5;    
-    mbi_set_pixel(x, y, r, g, b);
-  }
-
-
 
 
   // About 10% slower than the new implementation.
