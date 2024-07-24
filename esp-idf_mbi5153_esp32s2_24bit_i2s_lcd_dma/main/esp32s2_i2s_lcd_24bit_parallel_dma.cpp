@@ -14,9 +14,6 @@
 
 #include "esp32s2_i2s_lcd_24bit_parallel_dma.hpp"
 
-#include "mbi_gclk_addr_data_full_rate.h"
-  
-
 #include <driver/gpio.h>
 #if (ESP_IDF_VERSION_MAJOR == 5)
 #include <esp_private/periph_ctrl.h>
@@ -51,14 +48,79 @@ static const char *TAG = "i2s_24bit_lcd";
 
 #define ESP32_I2S_DEVICE I2S_NUM_0	
 
-/*************** Buffer Lengths ****************/
-
+/*************** Fixed Buffer Serial Bit Pulse Length Values ****************/
 // The length in parallel clocks. Actual memory use will be 3 x this.
-#define BUFF_BITLEN_VSYNC            1000    // Half rate data bit length + some clocks for vsync
-
-// Double the time as we don't have enough to send colour data in the time it takes to iterate through all the rows and stimulate LEDs + some clocks for vsync
-#define BUFF_BITLEN_GCLK_CDATA       ((20520*2))
+#define BUFF_BITLEN_VSYNC            400    // Half rate data bit length + some clocks for vsync
 #define BUFF_BITLEN_CONFIG           (500)   // Config stuff
+
+/******** GCLK Calculation Bit Pulse Length and Data - ChatGPT generated **********/
+/* LLM Prompt
+
+Task Description:
+The goal is to generate and print a series of byte sequences based on the following specifications:
+
+Each sequence consists of 512 repeats of three bytes.
+In each repeat, the first two bytes are the same and the third byte has its Most Significant Bit (MSB) set to 1.
+Repeat the sequence generation 20 times, embedding the current repeat count (from 0 to 19) in the least significant bits (LSBs) of each byte in the sequence.
+Add 20 zero bytes before and after each sequence, with also has the repeat value in the LSBs.
+Instead of pre-allocating memory for the entire sequence, the byte value at a given position should be calculated on the fly.
+*/
+
+const int BYTES_PER_REPEAT  = 3; // gclk pulse on 3rd byte, gives us enough time to send frame data then.
+const int REPEATS           = 513; // 513 gclks per the documentation
+const int SEQUENCE_SIZE     = BYTES_PER_REPEAT * REPEATS;
+const int REPEAT_COUNT      = 20; // 20 rows
+const int PADDING_SIZE      = 8; // some delay between row changes?
+const int TOTAL_SIZE        = (PADDING_SIZE + SEQUENCE_SIZE + PADDING_SIZE) * REPEAT_COUNT;
+
+
+// Generate MBI5153 GCLK DATA for Byte 0 of parallel output.
+// Function to calculate the value of a byte at a specific position
+uint8_t getByteValue(int position) {
+    int sequenceIndex = position / (PADDING_SIZE + SEQUENCE_SIZE + PADDING_SIZE);
+    int offset = position % (PADDING_SIZE + SEQUENCE_SIZE + PADDING_SIZE);
+/*
+    // Handle padding
+    if (offset < PADDING_SIZE || offset >= PADDING_SIZE + SEQUENCE_SIZE) {
+        return 0x00;
+    }
+*/
+    // Calculate position within the sequence
+    int sequencePosition = offset - PADDING_SIZE;
+    int byteIndex = sequencePosition % BYTES_PER_REPEAT;
+
+    uint8_t repeatValue = sequenceIndex & 0x1F;  // Repeat value embedded in the LSBs
+
+    // Handle padding
+    if (offset < PADDING_SIZE || offset >= PADDING_SIZE + SEQUENCE_SIZE) {
+        return repeatValue;
+    }    
+
+    // Calculate the byte value based on its position in the repeat
+    if (byteIndex == 2) {
+        return 0x80 | repeatValue;  // Third byte with MSB set
+    } else {
+        return repeatValue;  // First and second bytes
+    }
+}
+
+/*
+// Function to print the sequence in binary format for verification
+void printSequence() {
+    for (int i = 0; i < TOTAL_SIZE; ++i) {
+        std::cout << std::bitset<8>(getByteValue(i)) << " ";
+        if ((i + 1) % 8 == 0) std::cout << std::endl;
+    }
+}
+
+int main() {
+    // Print the final sequence
+    printSequence();
+
+    return 0;
+}
+
+*/
 
 /******************* Externs  ******************/
 DMA_DATA_TYPE *global_buffer_gclk_cdata   = NULL; // data for gclk + new payload of MBI serial colour data + vsync
@@ -285,14 +347,14 @@ static volatile int  interrupt_count = 0;
 
         // Ensure this order matches that of the struct from lsb to msb.
 
-        _cfg.pin_d0  = MBI_GCLK_PIN; 
-        _cfg.pin_d1  = ADDR_A_PIN; 
-        _cfg.pin_d2  = ADDR_B_PIN; 
-        _cfg.pin_d3  = ADDR_C_PIN; 
-        _cfg.pin_d4  = ADDR_D_PIN; 
-        _cfg.pin_d5  = ADDR_E_PIN; 
-        _cfg.pin_d6  = -1;
-        _cfg.pin_d7  = MBI_LAT_PIN;
+        _cfg.pin_d0  = ADDR_A_PIN; 
+        _cfg.pin_d1  = ADDR_B_PIN; 
+        _cfg.pin_d2  = ADDR_C_PIN; 
+        _cfg.pin_d3  = ADDR_D_PIN; 
+        _cfg.pin_d4  = ADDR_E_PIN; 
+        _cfg.pin_d5  = -1; 
+        _cfg.pin_d6  = MBI_LAT_PIN;
+        _cfg.pin_d7  = MBI_GCLK_PIN;
         _cfg.pin_d8  = MBI_R1_PIN;  // start of second byte
         _cfg.pin_d9  = MBI_G1_PIN;
         _cfg.pin_d10 = MBI_B1_PIN;
@@ -438,7 +500,7 @@ static volatile int  interrupt_count = 0;
         // Allocate the buffer for new greyscale data, at the same time as sending out gclks,
         // and finishing off with a vsync.
         {
-          size_t alloc_size_bytes  = (BUFF_BITLEN_GCLK_CDATA+BUFF_BITLEN_VSYNC) * sizeof(DMA_DATA_TYPE); // Up to 44,000  pulses of 24 bits in parallel.
+          size_t alloc_size_bytes  = (TOTAL_SIZE+BUFF_BITLEN_VSYNC) * sizeof(DMA_DATA_TYPE); // Up to 44,000  pulses of 24 bits in parallel.
           size_t actual_size = 0;
 
 #ifdef USE_PSRAM
@@ -446,9 +508,11 @@ static volatile int  interrupt_count = 0;
           esp_err_t err = esp_dma_malloc(alloc_size_bytes, ESP_DMA_MALLOC_FLAG_PSRAM, (void **) &global_buffer_gclk_cdata, &actual_size);
           assert(err == ESP_OK);
 #else
-          ESP_LOGI(TAG, "Allocating internal SRAM DMA memory for global_buffer_gclk_cdata.");  
+          ESP_LOGI(TAG, "Allocating SRAM DMA memory for global_buffer_gclk_cdata.");  
           global_buffer_gclk_cdata = static_cast<DMA_DATA_TYPE *>(heap_caps_malloc(alloc_size_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
           assert(global_buffer_gclk_cdata != nullptr);
+
+          actual_size = alloc_size_bytes;
 #endif
 
           size_t alignment_offset = actual_size - alloc_size_bytes;      
@@ -471,13 +535,7 @@ static volatile int  interrupt_count = 0;
           int dma_node_cnt = ll_desc_get_required_num(alloc_size_bytes); 
           dma_ll_gclk_cdata =  allocate_dma_descriptors_gb(dma_node_cnt, alloc_size_bytes, global_buffer_gclk_cdata, true);
 
-          // Populate with vsync data
-          int start_pos = BUFF_BITLEN_GCLK_CDATA+(BUFF_BITLEN_VSYNC/2);
-          int latch_length = 3; 
-          for (int i = latch_length; i > 0; i--) {        
-            global_buffer_gclk_cdata[start_pos++].lat = 1;                      
-          }
-        } // end gclk
+        } // end gclk buffer allocation
 
 
         // Allocate the buffer for command and other crap
@@ -521,15 +579,28 @@ static volatile int  interrupt_count = 0;
     } // dma_allocate
 
     esp_err_t mbi_load_inital_dma_data() {
-        { // block 1
 
-              // Part 1 - Load the GCLK data
+      { // block 0 vsync
+
+          // Populate with vsync data 
+          int start_pos = TOTAL_SIZE+(BUFF_BITLEN_VSYNC/2);
+          int latch_length = 3; 
+          for (int i = latch_length; i > 0; i--) {        
+            global_buffer_gclk_cdata[start_pos++].lat = 1;                      
+          }
+
+      }
+
+      { // block 1 gclk (no latches yet)
+
+              // Part 1 - Load the GCLK data 
               // NOTE: As we use a bit in byte0 for the LATCH as well, we need to ensure this is written after this is loaded.
-              int bitlen = sizeof(dma_gclk_addr_full_clk_rate);
+              //int bitlen = sizeof(dma_gclk_addr_full_clk_rate);
+              int bitlen = TOTAL_SIZE;
               for (int i = 0; i < bitlen; i++) {
                     // Load it twice
-                    global_buffer_gclk_cdata[i].byte0         = dma_gclk_addr_full_clk_rate[i];            
-                    global_buffer_gclk_cdata[bitlen+i].byte0 =  dma_gclk_addr_full_clk_rate[i];            
+                    global_buffer_gclk_cdata[i].byte0         = getByteValue(i);            
+                    //global_buffer_gclk_cdata[bitlen+i].byte0 =  1; // getByteValue(i);            
 
 #ifdef USE_PSRAM                              
                     Cache_WriteBack_Addr((uint32_t) &global_buffer_gclk_cdata[i], sizeof(DMA_DATA_TYPE)); // Ensure written to PSRAM, needs to be a &reference[x].byteX !   
@@ -646,7 +717,6 @@ static volatile int  interrupt_count = 0;
 
     } // end 
 
-
     esp_err_t mbi_start_output_loop()
     {
       auto dev = getDev();
@@ -674,7 +744,7 @@ static volatile int  interrupt_count = 0;
     void mbi_clear()
     {
         // Iterate only for length of greyscale data bitlength.
-        for (int i = 0; i< BUFF_BITLEN_GCLK_CDATA; i++) { 
+        for (int i = 0; i< TOTAL_SIZE; i++) { 
 
           global_buffer_gclk_cdata[i].byte1 = 0; 
           global_buffer_gclk_cdata[i].byte2 = 0; 
@@ -737,102 +807,6 @@ static volatile int  interrupt_count = 0;
         #endif
     }
 
-    void mbi_set_pixel_old(uint8_t x, uint8_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data) {
-
-      if (x >= PANEL_PHY_RES_X || y >= PANEL_PHY_RES_Y) {
-        return;
-      }
-
-      x += 2;  // offset for missing pixels on the left
-
-      // Row offset + channel offset + individual IC LED offset
-      // Calculate data array start position
-      int y_normalised  = y % PANEL_SCAN_LINES;  // Only have 20 rows of data...
-      int bit_start_pos = (1280 * y_normalised) + ((x % 16) * 80) + ((x / 16) * 16);  
-
-      int rgb_channel = (y / PANEL_SCAN_LINES) + 1;   // three is an important bit
-
-      /*
-        MBI5153 provides a selectable 14-bit or 13-bit gray scale by setting the configuration register1 bit [7]. The default 
-        value is set to ’0’ for 14-bit color depth. In 14-bit gray scale mode, users should still send 16-bit data with 2-bit ‘0’ in 
-        LSB bits. For example, {14’h1234, 2’h0}. 
-      */    
-
-      // RGB colour data provided is only 8bits, so we'll fill it from bit 16 down to bit 8
-      // 14-bit resolution = 16,384
-      //  8-bit resolutoin = 255     
-      int subpixel_colour_bit = 8;
-      int offset = 0;
-
-      //ESP_LOGD(TAG, "RGB Channel is is %d", rgb_channel);
-
-      switch (rgb_channel)
-      {
-        case 1:
-        {
-            while (subpixel_colour_bit > 0) { // shift out MSB first per the documentation.
-              subpixel_colour_bit--;  // start from 7
-              uint8_t mask = 1 << subpixel_colour_bit;
-
-              global_buffer_gclk_cdata[bit_start_pos+offset].r1 = (mask & r_data ) ? 1:0; // (r_data & mask);      
-              global_buffer_gclk_cdata[bit_start_pos+offset].g1 = (mask & g_data ) ? 1:0; //(g_data & mask);      
-              global_buffer_gclk_cdata[bit_start_pos+offset].b1 = (mask & b_data ) ? 1:0;// (g_data & mask);      
-              offset++;
-            }
-        } // rgb1
-        break;
-
-        case 2:
-        {
-            while (subpixel_colour_bit > 0) { // shift out MSB first per the documentation.
-              subpixel_colour_bit--;  // start from 7
-              uint8_t mask = 1 << subpixel_colour_bit;
-
-              global_buffer_gclk_cdata[bit_start_pos+offset].r2 = (mask & r_data ) ? 1:0   ;   
-              global_buffer_gclk_cdata[bit_start_pos+offset].g2 = (mask & g_data ) ? 1:0   ;       
-              global_buffer_gclk_cdata[bit_start_pos+offset].b2 = (mask & b_data ) ? 1:0   ;      
-              offset++;
-            }
-        } // rgb2
-        break;
-
-        case 3:
-        {
-            while (subpixel_colour_bit > 0) { // shift out MSB first per the documentation.
-              subpixel_colour_bit--;  // start from 7
-              uint8_t mask = 1 << subpixel_colour_bit;
-
-              global_buffer_gclk_cdata[bit_start_pos+offset].r3 = (mask & r_data ) ? 1:0   ;        
-              global_buffer_gclk_cdata[bit_start_pos+offset].g3 = (mask & g_data ) ? 1:0   ;       
-              global_buffer_gclk_cdata[bit_start_pos+offset].b3 = (mask & b_data ) ? 1:0   ;       
-              offset++;
-            }
-        } // rgb1
-        break;
-
-        case 4:
-        {
-            while (subpixel_colour_bit > 0) { // shift out MSB first per the documentation.
-              subpixel_colour_bit--;  // start from 7
-              uint8_t mask = 1 << subpixel_colour_bit;
-
-              global_buffer_gclk_cdata[bit_start_pos+offset].r4 = (mask & r_data ) ? 1:0   ;       
-              global_buffer_gclk_cdata[bit_start_pos+offset].g4 = (mask & g_data ) ? 1:0   ;       
-              global_buffer_gclk_cdata[bit_start_pos+offset].b4 = (mask & b_data ) ? 1:0   ;       
-              offset++;
-            }
-        } // rgb1                       
-        break;
-
-      } // end switch
-
-#ifdef USE_PSRAM          
-        Cache_WriteBack_Addr((uint32_t) &global_buffer_gclk_cdata[bit_start_pos], sizeof(DMA_DATA_TYPE)*8); // Ensure written to PSRAM, needs to be a &reference[x].byteX !                     
-#endif        
-               
-      // We assumpt bit_start_postions we don't touch should be cleared, are.
-
-    }  // mbi_set_pixel  
 
     void mbi_update()
     {

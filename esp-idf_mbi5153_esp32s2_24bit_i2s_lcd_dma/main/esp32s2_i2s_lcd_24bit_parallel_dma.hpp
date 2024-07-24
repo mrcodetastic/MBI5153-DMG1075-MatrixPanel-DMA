@@ -48,14 +48,14 @@ typedef struct {
   //uint8_t byte0; // lsb
   union {
     struct {
-        uint8_t gclk:1; //lsb
-        uint8_t a:1;
+        uint8_t a:1; //lsb
         uint8_t b:1;
         uint8_t c:1;
         uint8_t d:1;
         uint8_t e:1;
         uint8_t notused0:1;
         uint8_t lat:1;
+        uint8_t gclk:1;
     };
     uint8_t byte0;
   };

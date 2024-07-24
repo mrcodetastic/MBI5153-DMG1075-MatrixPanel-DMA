@@ -60,11 +60,14 @@ void output_task(void *arg) {
 
       blink_led();
       printf("Free internal SRAM heap available: %zu bytes\n", heap_caps_get_free_size( MALLOC_CAP_INTERNAL ));
-      //printf("I2S DMA out_eof interrupt count is: %d\n", get_interrupt_count());
+      printf("I2S DMA out_eof interrupt count is: %d\n", get_interrupt_count());
 
-      for (int i = 4; i >= 0; i--) { // wait 5 seconds
+ 
+      // If you don't have the delay, the main core thead will never get time again.
+      for (int i = 10; i >= 0; i--) { // wait 10 seconds
           vTaskDelay(1000 / portTICK_PERIOD_MS);
       }
+
       fflush(stdout);
     }
 } // end output_task
@@ -310,7 +313,7 @@ void rgb_loop_task(void *arg) {
     static int rgb_mode = 0;
 
     while (1) {
-      
+      /*
       currentTime = millis();
 
       if ((currentTime - lastTime) > 1000)
@@ -320,7 +323,8 @@ void rgb_loop_task(void *arg) {
           frame_count = 0;
           lastTime = currentTime;
 
-      }       
+      } 
+      */      
 
       int r = 0;
       int g = 0;
@@ -338,8 +342,12 @@ void rgb_loop_task(void *arg) {
       else if (rgb_mode == 2)
       {
         b = 255;
-        rgb_mode = 0;
+        rgb_mode++;
       }
+     else if (rgb_mode == 3) // black
+      {
+        rgb_mode = 0;
+      }      
 
 
 
@@ -351,7 +359,7 @@ void rgb_loop_task(void *arg) {
 
         mbi_update();
         vTaskDelay(1000 / portTICK_PERIOD_MS);              
-        mbi_clear();  
+        //mbi_clear();  
 
     } // draw wireframe     
        
@@ -370,7 +378,7 @@ extern "C" void app_main(void)
 
     blink_led();    
 
-    for (int delaysec = 2; delaysec > 0; delaysec--)
+    for (int delaysec = 3; delaysec > 0; delaysec--)
     {
       vTaskDelay(1000 / portTICK_PERIOD_MS);
       ESP_LOGI("app_main", "Starting in %d...", delaysec);
@@ -383,20 +391,11 @@ extern "C" void app_main(void)
     xTaskCreate(output_task, "Output_Task", 4096, NULL, 10, &myTaskHandle1);
 
 
-    for (int y = 0; y < PANEL_MBI_RES_Y/2; y++) {
-      for (int x = 0; x < PANEL_MBI_RES_X; x++) {
-          mbi_set_pixel(x, y, 255,  255,  255);
-      }
-    }
-
-    mbi_update();    
-
-
     ESP_LOGI("app_main", "Creating graphics task.");        
     //xTaskCreate(graphics_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
-    //xTaskCreate(spinning_cube_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
+    xTaskCreate(spinning_cube_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
 
-    xTaskCreate(rgb_loop_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
+    //xTaskCreate(rgb_loop_task, "Graphics_Task", 4096, NULL, 10, &myTaskHandle2);
 
 
 

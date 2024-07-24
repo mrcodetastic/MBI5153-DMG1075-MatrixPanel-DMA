@@ -25,8 +25,8 @@
   #define ADDR_D_PIN              GPIO_NUM_33
   #define ADDR_E_PIN              GPIO_NUM_34
 
-  #define MBI_GCLK_PIN            GPIO_NUM_37  // OE PIN IS GCLK apparently
-  #define MBI_LAT_PIN             GPIO_NUM_38  //  data/command
+  #define MBI_GCLK_PIN            GPIO_NUM_38  // OE PIN IS GCLK apparently
+  #define MBI_LAT_PIN             GPIO_NUM_37  //  data/command
   #define MBI_DCLK_PIN            GPIO_NUM_35  // data clocking line?
 
   // First 1/4 of panel -> 20 rows
