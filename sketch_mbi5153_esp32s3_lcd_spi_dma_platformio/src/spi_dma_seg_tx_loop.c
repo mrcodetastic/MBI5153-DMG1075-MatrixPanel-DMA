@@ -68,8 +68,6 @@ static const char* const TAG = "gpspi2_spi_dma_seg_tx_loop";
  *
  */
 
-
-
 /**************************************************************************************/
 
 intr_handle_t intr_handle;
@@ -259,7 +257,13 @@ esp_err_t spi_setup(void)
 
   ESP_LOGD(TAG, "spi_setup() complete");  
 
+  // populate payload
+  allocate_gclk_dma_memory();
+
+  // Send it once
   spi_transfer_initial_payload();
+
+  // Setup segmented transfers
   spi_dma_seg_setup();
 
   return ESP_OK;
@@ -347,84 +351,6 @@ esp_err_t spi_dma_seg_setup()
 
 }
 
-/*
-esp_err_t spi_dma_seg_setup_old()
-{
-  // NOTES:
-  // [Guru Meditation Error: Core  1 panic'ed (Interrupt wdt timeout on CPU1). 
-  //  .... will occur when DMA payload < what SPI payload device is expecting. !
-
-  // If there is ANY difference in the spi_seg_conf_X[1] size VS what the DMA engine 
-  // sends, there will be a timeout / error with SPI.
-
-  ESP_LOGD(TAG, "Setup SPI DMA-controlled configurable segmented transfer");
-
-  // This function has already been run, don't do it again! Memory leak.
-  assert ( dma_lldesc_required == 0);
-
-  //
-  // Segment 1
-  //
-  // Initialize config words
-  spi_seg_conf_1[0]  = 0xA0000000UL;  // set magic value
-  spi_seg_conf_1[0]  |= ( 1 << 3) | ( 1 << 6);  // SPI_USER_REG | SPI_MS_DLEN_REG
-
-
-  spi_seg_conf_value_nxt_true   = GPSPI2.user.val | SPI_USR_CONF_NXT;
-  spi_seg_conf_value_nxt_false  = GPSPI2.user.val & ~(SPI_USR_CONF_NXT); 
-
-  // SPI_USER_REG
-  //spi_seg_conf_1[1]  = GPSPI2.user.val | SPI_USR_CONF_NXT; // If this bit is set, it means this configurable segmented transfer will continue its next transaction (segment).
-  spi_seg_conf_1[1]  = spi_seg_conf_value_nxt_true; // If this bit is set, it means this configurable segmented transfer will continue its next transaction (segment).
-
-  // SPI_MS_DLEN_REG
-  spi_seg_conf_1[2] = (sizeof(spi_tx_payload_testchunk2) * 8) -1; // must match exactly the dma payload total chunk size -1
-
-
-  //
-  // Segment 2
-  //
-  // Initialize config words
-  spi_seg_conf_2[0]  = spi_seg_conf_1[0];  // set magic value
-
-  // SPI_USER_REG // clear the sigmented transfer bit
-  // n & ~(1 << k)  
-  //spi_seg_conf_2[1]  = GPSPI2.user.val & ~(SPI_USR_CONF_NXT); // If this bit is set, it means this configurable segmented transfer will continue its next transaction (segment).
-
-  spi_seg_conf_2[1]  = spi_seg_conf_1[1] ; // If this bit is set, it means this configurable segmented transfer will continue its next 
-
-  // SPI_MS_DLEN_REG
-  spi_seg_conf_2[2] = spi_seg_conf_1[2]; // 
-
-
-  // Set up linked lists for next descriptors
-  // lldesc_setup_link is in soc/lldesc.c
-
-  dma_lldesc_required = 1; // for CONF dma lldesc 
-  dma_lldesc_required += lldesc_get_required_num(sizeof(spi_tx_payload_testchunk2)); 
-
-  dma_lldesc_required *= 2;
-  ESP_LOGI(TAG, "%d SPI DMA descriptors required for cover spi_tx_payload_chunk2 data.", dma_lldesc_required);   
-
-  // Allocate memory
-  dma_data_lldesc = (lldesc_t*) heap_caps_malloc(sizeof(lldesc_t) * dma_lldesc_required, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);  
-
-  // Future note: Each SPI segment must be < 32kB.
-  int offset = 0;
-  offset = lldesc_setup_chunk(dma_data_lldesc, &spi_seg_conf_1, 4*3, 0); // setup dma link list descriptor for CONF data
-  offset = lldesc_setup_chunk(dma_data_lldesc, &spi_tx_payload_testchunk2, sizeof(spi_tx_payload_testchunk2), offset); // setup dma link list descriptors for payload
-
-  offset = lldesc_setup_chunk(dma_data_lldesc, &spi_seg_conf_2, 4*3, offset); // setup dma link list descriptor for CONF data
-  offset = lldesc_setup_chunk(dma_data_lldesc, &spi_tx_payload_testchunk2, sizeof(spi_tx_payload_testchunk2), offset); // setup dma link list descriptors for payload  
-
-  lldesc_setup_chain(dma_data_lldesc, dma_lldesc_required, true); // link them all together
-
-  return ESP_OK;
-
-}
-*/
-
-
 esp_err_t spi_transfer_loop_start()
 {
   esp_err_t ret;
@@ -495,7 +421,6 @@ esp_err_t spi_transfer_loop_stop(void) {
   ESP_LOGD(TAG, "Calling spi_transfer_loop_stop()");  
 
   //spi_seg_conf_2[1]  = GPSPI2.user.val & ~(SPI_USR_CONF_NXT); // If this bit is set, it means this configurable segmented transfer will continue its next 
-
   spi_seg_conf_1[1]  = spi_seg_conf_value_nxt_false; // If this bit is set, it means this configurable segmented transfer will continue its next 
 
   // Wait until completion.
