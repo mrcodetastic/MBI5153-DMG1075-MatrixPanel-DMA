@@ -133,7 +133,7 @@ lldesc_t *dma_ll_configuration = NULL;
 volatile bool dma_buffer_sent = false;
 static volatile int  interrupt_count = 0;
 
-/*
+
     static void IRAM_ATTR i2s_dma_isr(void* arg) {
 
       interrupt_count = interrupt_count + 1;
@@ -146,7 +146,7 @@ static volatile int  interrupt_count = 0;
       dma_buffer_sent = true;
 
     }
-*/
+
     int get_interrupt_count(){
       return interrupt_count;
     }
@@ -300,6 +300,7 @@ static volatile int  interrupt_count = 0;
 
               if (loop_back) {
                 dma[n].empty = (uintptr_t)&dma[0];
+                dma[n].eof = 1; // generate eof interrupt for the hell of it
                 ESP_LOGD("allocate_dma_descriptors()", "Linking lldesc_t  pos %d back to pos 0", n);      
               }
               else
@@ -377,13 +378,13 @@ static volatile int  interrupt_count = 0;
         auto dev = getDev();
         volatile int iomux_signal_base;
         volatile int iomux_clock;
-       // int irq_source;
+        int irq_source;
 
         periph_module_reset(PERIPH_I2S0_MODULE);
         periph_module_enable(PERIPH_I2S0_MODULE);
 
         iomux_clock = I2S0O_WS_OUT_IDX;
-        //irq_source = ETS_I2S0_INTR_SOURCE;
+        irq_source = ETS_I2S0_INTR_SOURCE;
 
         if ( _cfg.parallel_width == 24)
         {
@@ -483,13 +484,13 @@ static volatile int  interrupt_count = 0;
         dev->fifo_conf.tx_24msb_en = 0;
 
         //dev->int_ena.out_done = 1;
-        //dev->int_ena.out_eof  = 1; // no use for this. No implementation works which is of use.
+        dev->int_ena.out_eof  = 1; // no use for this. No implementation works which is of use.
 
         // Setup I2S Interrupt
         //SET_PERI_REG_BITS(I2S_INT_ENA_REG(I2S_NUM_0), I2S_OUT_EOF_INT_ENA_V, 1, I2S_OUT_EOF_INT_ENA_S);
 
         // Allocate a level 1 intterupt: lowest priority, as ISR isn't urgent and may take a long time to complete
-        // ret = esp_intr_alloc(irq_source, (int)(ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_LEVEL1), i2s_dma_isr, NULL, NULL);
+        ret = esp_intr_alloc(irq_source, (int)(ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_LEVEL1), i2s_dma_isr, NULL, NULL);
       
         return ret;
       }
