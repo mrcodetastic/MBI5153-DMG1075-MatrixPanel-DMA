@@ -214,16 +214,16 @@ esp_err_t spi_setup(void)
   ESP_LOGD(TAG, "Initializing SPI bus");
   
   spi_bus_config_t host_conf;
-  // ensure GND is connected on the logic analyser!!
-  // Don't use MOSI as it has a differnt value
-  host_conf.data0_io_num = MBI_SRCLK; // MOSI / Not used (for debug)
-  host_conf.data1_io_num = -1; // MISO / Not Used
-  host_conf.data2_io_num = MBI_GCLK; // gclk
-  host_conf.data3_io_num = ADDR_A_PIN; // a
-  host_conf.data4_io_num = ADDR_B_PIN; // b
-  host_conf.data5_io_num = ADDR_C_PIN; // c
-  host_conf.data6_io_num = ADDR_D_PIN; // d 
-  host_conf.data7_io_num = ADDR_E_PIN; // e
+
+  // ensure GND is connected on the logic analyser when testing!
+  host_conf.data0_io_num = ADDR_A_PIN;
+  host_conf.data1_io_num = ADDR_B_PIN;
+  host_conf.data2_io_num = ADDR_C_PIN;
+  host_conf.data3_io_num = ADDR_D_PIN; 
+  host_conf.data4_io_num = ADDR_E_PIN;
+  host_conf.data5_io_num = -1; 
+  host_conf.data6_io_num = -1;
+  host_conf.data7_io_num = MBI_GCLK: 
   host_conf.sclk_io_num  = -1; // clock not used  (therefore don't have SPICOMMON_BUSFLAG_SCLK below )
   host_conf.max_transfer_sz = 32768; //32768 is the max for S3
   host_conf.flags = SPICOMMON_BUSFLAG_OCTAL | SPICOMMON_BUSFLAG_GPIO_PINS | SPICOMMON_BUSFLAG_MASTER;
