@@ -6,17 +6,18 @@
  ******************************************************************************************/
 #pragma once
 
-/******** GCLK Calculation Bit Pulse Length and Data - ChatGPT generated **********/
-/* LLM Prompt
+/******** GCLK Calculation Bit Pulse Length and Data - ChatGPT generated **********
+ >> LLM Prompt
 
-Task Description:
-The goal is to generate and print a series of byte sequences based on the following specifications:
+Task Description: The goal is to create a function that is given an index value, calculates and returns a byte value based on the following:
+	* Each row-sequence consists of 513 repeats of a three byte sequence.
+	* In each sequence, the first two bytes are the same and the third byte has its Most Significant Bit (MSB) set to 1. This byte is called the GCLK byte.
+	* Repeat the row-sequence 20 times, embedding the current row-sequence value (starting from 0 to 19) in the two bits to the left of the least significant bit (LSB) of each byte in the row-sequence.
+	* Add 8 bytes of padding before and after each row-sequence, that only contains the row-sequence value.
+	* Instead of pre-allocating memory for the overall sequence, individual byte values for a given position should be calculated on the fly.
 
-Each sequence consists of 512 repeats of three bytes.
-In each repeat, the first two bytes are the same and the third byte has its Most Significant Bit (MSB) set to 1.
-Repeat the sequence generation 20 times, embedding the current repeat count (from 0 to 19) in the least significant bits (LSBs) of each byte in the sequence.
-Add 20 zero bytes before and after each sequence, with also has the repeat value in the LSBs.
-Instead of pre-allocating memory for the entire sequence, the byte value at a given position should be calculated on the fly.
+For any extra code that is generated to print the output of this propsoed code should print the value of each byte in binary, and also print the overall sequence size.	
+
 */
 
 const int BYTES_PER_REPEAT  = 3; // gclk pulse on 3rd byte, gives us enough time to send frame data then.
@@ -24,9 +25,11 @@ const int REPEATS           = 513; // 513 gclks per the documentation
 const int SEQUENCE_SIZE     = BYTES_PER_REPEAT * REPEATS;
 const int REPEAT_COUNT      = 20; // 20 rows
 const int PADDING_SIZE      = 8; // some delay between row changes?
-const int GCLK_TOTAL_SIZE        = (PADDING_SIZE + SEQUENCE_SIZE + PADDING_SIZE) * REPEAT_COUNT;
+const int GCLK_TOTAL_SIZE   = (PADDING_SIZE + SEQUENCE_SIZE + PADDING_SIZE) * REPEAT_COUNT;
 
-DMA_ATTR uint8_t *spi_tx_octal_payload   = NULL; // data for gclk
+// GCLK_TOTAL_SIZE = 31100 which is just under the SPI max transfer size of 32kB per SEGMENT
+
+DMA_ATTR static uint8_t *spi_tx_octal_payload   = NULL; // data for gclk
 
 // Generate MBI5153 GCLK DATA for Byte 0 of parallel output.
 // Function to calculate the value of a byte at a specific position
@@ -42,14 +45,14 @@ uint8_t getByteValue(int position) {
 
     // Handle padding
     if (offset < PADDING_SIZE || offset >= PADDING_SIZE + SEQUENCE_SIZE) {
-        return repeatValue;
+        return (repeatValue << 2);
     }    
 
     // Calculate the byte value based on its position in the repeat
     if (byteIndex == 2) {
-        return 0x80 | repeatValue;  // Third byte with MSB set
+        return 0x80 | (repeatValue << 2);  // Third byte with MSB set
     } else {
-        return repeatValue;  // First and second bytes
+        return (repeatValue << 2);  // First and second bytes
     }
 }
 
@@ -73,13 +76,18 @@ int main() {
 
 void allocate_gclk_dma_memory()
 {
+	/*
 	if (spi_tx_octal_payload != NULL) {
           ESP_LOGE("spi_dma_seg_tx_payload", "Looks like we've already called allocate_gclk_dma_memory()!");  		
 		  return;
 	}
+	*/
+    
+	// We don't want to do this twice
+	assert(spi_tx_octal_payload == NULL);
 
 	// Allocate
-          size_t alloc_size_bytes  = (GCLK_TOTAL_SIZE) * sizeof(uint8_t); // Up to 44,000  pulses of 24 bits in parallel.
+          size_t alloc_size_bytes  = (GCLK_TOTAL_SIZE) * sizeof(uint8_t);
           size_t actual_size = 0;
 
 #ifdef USE_PSRAM
@@ -94,8 +102,10 @@ void allocate_gclk_dma_memory()
           actual_size = alloc_size_bytes;
 #endif
 
+	ESP_LOGI("spi_dma_seg_tx_payload", "GCLK data total size: %d bytes.", GCLK_TOTAL_SIZE);  
+
 	// Populate based on algo
-	for (int i = 0; i < GCLK_TOTAL_SIZE; i++) {
+	for (int i = 0; i < alloc_size_bytes; i++) {
 		spi_tx_octal_payload[i] = getByteValue(i);
 	}
 } // end allocate_gclk_dma_memory

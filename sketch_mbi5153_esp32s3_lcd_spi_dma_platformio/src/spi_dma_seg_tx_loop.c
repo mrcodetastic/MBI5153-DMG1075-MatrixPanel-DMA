@@ -216,15 +216,20 @@ esp_err_t spi_setup(void)
   spi_bus_config_t host_conf;
 
   // ensure GND is connected on the logic analyser when testing!
-  host_conf.data0_io_num = ADDR_A_PIN;
-  host_conf.data1_io_num = ADDR_B_PIN;
-  host_conf.data2_io_num = ADDR_C_PIN;
-  host_conf.data3_io_num = ADDR_D_PIN; 
-  host_conf.data4_io_num = ADDR_E_PIN;
-  host_conf.data5_io_num = -1; 
-  host_conf.data6_io_num = -1;
-  host_conf.data7_io_num = MBI_GCLK: 
+  host_conf.data0_io_num = -1;
+  host_conf.data1_io_num = -1;
   host_conf.sclk_io_num  = -1; // clock not used  (therefore don't have SPICOMMON_BUSFLAG_SCLK below )
+
+  host_conf.data2_io_num = ADDR_A_PIN;
+  host_conf.data3_io_num = ADDR_B_PIN; 
+
+  // If any of data4_io_num to data7_io_num do not have GPIO outputs assigned (in octal mode) 
+  // then there will be a "Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled."
+  host_conf.data4_io_num = ADDR_C_PIN;
+  host_conf.data5_io_num = ADDR_D_PIN; 
+  host_conf.data6_io_num = ADDR_E_PIN;
+
+  host_conf.data7_io_num = MBI_GCLK;
   host_conf.max_transfer_sz = 32768; //32768 is the max for S3
   host_conf.flags = SPICOMMON_BUSFLAG_OCTAL | SPICOMMON_BUSFLAG_GPIO_PINS | SPICOMMON_BUSFLAG_MASTER;
   host_conf.intr_flags = ESP_INTR_FLAG_SHARED;
@@ -284,7 +289,8 @@ esp_err_t spi_transfer_initial_payload()
   // What do we do here? TO DO, send null packet just to kick off transfer?
   // https://www.esp32.com/viewtopic.php?p=123221#p123211
   trans.tx_buffer = spi_tx_octal_payload; 
-  trans.length = (sizeof(spi_tx_octal_payload)) * 8;
+  //trans.length = (sizeof(spi_tx_octal_payload)) * 8;
+  trans.length = GCLK_TOTAL_SIZE * 8;
   trans.rx_buffer = NULL; 
   trans.rxlength = 0;
 
@@ -327,23 +333,26 @@ esp_err_t spi_dma_seg_setup()
   spi_seg_conf_1[1]  = spi_seg_conf_value_nxt_true; // If this bit is set, it means this configurable segmented transfer will continue its next transaction (segment).
 
   // SPI_MS_DLEN_REG
-  spi_seg_conf_1[2] = (sizeof(spi_tx_octal_payload) * 8) -1; // must match exactly the dma payload total chunk size -1
+  //spi_seg_conf_1[2] = (sizeof(spi_tx_octal_payload) * 8) -1; // must match exactly the dma payload total chunk size -1
+  spi_seg_conf_1[2] = (GCLK_TOTAL_SIZE * 8) -1; // must match exactly the dma payload total chunk size -1
 
 
   // Set up linked lists for next descriptors
   // lldesc_setup_link is in soc/lldesc.c
 
   dma_lldesc_required = 1; // for CONF dma lldesc 
-  dma_lldesc_required += lldesc_get_required_num(sizeof(spi_tx_octal_payload)); 
+  //dma_lldesc_required += lldesc_get_required_num(sizeof(spi_tx_octal_payload)); 
+  dma_lldesc_required += lldesc_get_required_num(GCLK_TOTAL_SIZE * sizeof(uint8_t)); 
   ESP_LOGI(TAG, "%d SPI DMA descriptors required for cover spi_tx_payload_chunk2 data.", dma_lldesc_required);   
 
   // Allocate memory
-  dma_data_lldesc = (lldesc_t*) heap_caps_malloc(sizeof(lldesc_t) * dma_lldesc_required, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);  
+  dma_data_lldesc = (lldesc_t*) heap_caps_malloc((sizeof(lldesc_t) * dma_lldesc_required), MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);  
 
   // Future note: Each SPI segment must be < 32kB.
   int offset = 0;
   offset = lldesc_setup_chunk(dma_data_lldesc, &spi_seg_conf_1, 4*3, 0); // setup dma link list descriptor for CONF data
-  offset = lldesc_setup_chunk(dma_data_lldesc, &spi_tx_octal_payload, sizeof(spi_tx_octal_payload), offset); // setup dma link list descriptors for payload
+  //offset = lldesc_setup_chunk(dma_data_lldesc, &spi_tx_octal_payload, sizeof(spi_tx_octal_payload), offset); // setup dma link list descriptors for payload
+  offset = lldesc_setup_chunk(dma_data_lldesc, spi_tx_octal_payload, (GCLK_TOTAL_SIZE * sizeof(uint8_t)), offset); // setup dma link list descriptors for payload
 
   lldesc_setup_chain(dma_data_lldesc, dma_lldesc_required, true); // link them all together
 
