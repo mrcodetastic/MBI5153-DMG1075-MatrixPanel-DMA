@@ -70,7 +70,7 @@ static const uint16_t mbi_grey_data_latch_bits[] = {79, 159, 239, 319, 399, 479,
 class Matrix : public GFX {
 
  public:
-  Matrix() : GFX (PANEL_MBI_RES_X, PANEL_MBI_RES_Y) {  }
+  Matrix() : GFX (PANEL_PHY_RES_X, PANEL_PHY_RES_Y) {  }
 
   ~Matrix() {
   }
@@ -542,13 +542,6 @@ class Matrix : public GFX {
         }
       }
    
-/*
-    // This attempted optimsation makes no difference.
-    for (int pos = 0; pos < sizeof(mbi_grey_data_latch_bits)/sizeof(mbi_grey_data_latch_bits[0]); pos++) {
-        dma_grey_gpio_data[pos] |= BIT_LAT;
-    }
-*/
-
     //log_d(TAG, "Sending greyscale data buffer out via LCD DMA.");
     dma_bus.send_stuff_once(dma_grey_gpio_data, dma_grey_buffer_size, true);  // sending payload hence TRUE
 
