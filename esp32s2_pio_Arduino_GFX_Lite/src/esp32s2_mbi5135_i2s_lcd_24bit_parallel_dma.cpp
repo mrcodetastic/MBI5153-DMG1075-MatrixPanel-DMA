@@ -293,7 +293,8 @@
             ESP_LOGD("allocate_dma_descriptors()", "Linking to payload buff at memory location 0x%08X.", (uintptr_t)dma[n].buf);                     
 
             payload_size -= dmachunklen;        
-            buffer += dmachunklen;  
+            //buffer += dmachunklen;  
+            buffer = (uint8_t*)buffer + dmachunklen;  
 
             if ( n == (count-1) ) { // last element
 
@@ -582,12 +583,15 @@
 
       { // block 0 vsync
 
+          /*
           // Populate with vsync data 
           int start_pos = TOTAL_SIZE+(BUFF_BITLEN_VSYNC/2);
           int latch_length = 3; 
           for (int i = latch_length; i > 0; i--) {        
             global_buffer_gclk_cdata[start_pos++].lat = 1;                      
           }
+          */
+         dma_set_vsync();
 
       }
 
@@ -753,6 +757,49 @@
           // PSRAM on S2 sucks ballz so not going to bother.
         }
     }
+
+  /**
+   * This function sets or clears a series of bytes in the `global_buffer_gclk_cdata` buffer
+   * to indicate the presence of a VSYNC signal. However, calling these function
+   * during program execution while the DMA engine is asynchronously sending out
+   * data can lead to unpredictable results.
+   * 
+   * The problem lies in the fact that `latch_length` is hardcoded to 3, meaning 
+   * it sets three consecutive bits in the buffer to 1. However, there's no 
+   * guarantee that exactly three sequential HIGH values of the LATch pin will be 
+   * transmitted by the DMA engine. Since the DMA operation is asynchronous, 
+   * the engine might be in the middle of transmitting the buffer when this 
+   * function is called. As a result, the DMA might send out a partial (1 or 2 pulses)
+   * leading to the MBI panels thinking it's a greyscale LATCH or VSYNC 
+   * being transmitted which will screw up, what is displayed on the physical panel.
+   * 
+   * In summary, because the DMA engine can transmit data at any time, modifying 
+   * the buffer while the DMA operation is in progress can result in race conditions, 
+   * where the `latch_length` of 3 bytes might not correspond to what actually gets 
+   * sent out. This could potentially cause synchronization issues or other 
+   * erratic behavior in the data being transmitted.
+   */
+    void dma_set_vsync()
+    {
+          // Populate vsync data 
+          int start_pos = TOTAL_SIZE+(BUFF_BITLEN_VSYNC/2);
+          int latch_length = 3; 
+          for (int i = latch_length; i > 0; i--) {        
+            global_buffer_gclk_cdata[start_pos++].lat = 1;                      
+          }
+
+    }
+
+    void dma_clr_vsync() // essentially stops the panel updating.
+    {
+          // Clear the vsync data 
+          int start_pos = TOTAL_SIZE+(BUFF_BITLEN_VSYNC/2);
+          int latch_length = 3; 
+          for (int i = latch_length; i > 0; i--) {        
+            global_buffer_gclk_cdata[start_pos++].lat = 0;                      
+          }
+
+    }    
 
     IRAM_ATTR void mbi_set_pixel(int16_t x, int16_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data) {
 

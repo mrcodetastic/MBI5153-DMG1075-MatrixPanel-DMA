@@ -198,7 +198,7 @@ int frame_count = 0;
 void spinning_cube_task(void *arg) {
 
     gfx_layer_fg.clear();            
-    gfx_layer_fg.drawCentreText("COOOL!", MIDDLE, &FreeSansBold9pt7b, CRGB(252,36,28));
+    gfx_layer_fg.drawCentreText("COOOL!", MIDDLE, &FreeSansBold9pt7b, CRGB(0, 0, 255));
     gfx_layer_fg.autoCenterX(); // because I don't trust AdaFruit to perfectly place the contents in the middle
 
 
@@ -245,15 +245,14 @@ void spinning_cube_task(void *arg) {
 
 
         frame_count++;    
-        gfx_layer_bg.dim(200); // dim existing pixels
+        gfx_layer_bg.dim(180); // dim existing pixels
         draw_wireframe(); // draw to GFX Layer BUFFER!
-        //gfx_layer.display();
 
-        gfx_compositor.Blend(gfx_layer_bg, gfx_layer_fg); // this will send to panel output as well.
+        delay(25);
+        
+        // this will send to panel output as well via. callback
+        gfx_compositor.Blend(gfx_layer_bg, gfx_layer_fg); 
  
-
-        //mbi_update();
-        //vTaskDelay(20 / portTICK_PERIOD_MS);              
         //mbi_clear(); // don't need this if using layers       
     } // draw wireframe     
        

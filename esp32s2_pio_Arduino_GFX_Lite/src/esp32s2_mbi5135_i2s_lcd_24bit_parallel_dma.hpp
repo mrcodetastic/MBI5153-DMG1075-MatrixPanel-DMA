@@ -147,3 +147,6 @@ typedef struct {
     void mbi_clear();    
     void mbi_set_pixel(int16_t x, int16_t y, uint8_t r_data, uint8_t g_data, uint8_t b_data);
     void mbi_update();    
+
+    void dma_set_vsync();
+    void dma_clr_vsync();
