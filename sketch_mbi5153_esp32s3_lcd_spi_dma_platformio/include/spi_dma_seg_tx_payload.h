@@ -47,7 +47,7 @@ uint8_t getByteValue(int position) {
     if (offset < PADDING_SIZE || offset >= PADDING_SIZE + SEQUENCE_SIZE) {
 		// return (repeatValue << 2);
 
-		// fix slight gclk sync out of sync on ESP32S3... causes image on panel to get out of sync with rowscan and slide around
+		// fix slight gclk sync out of sync on ESP32S3... causes gclk to get out of sync with rowscan and image to slide around
 		return 0x80 | (repeatValue << 2);	
     }    
 
