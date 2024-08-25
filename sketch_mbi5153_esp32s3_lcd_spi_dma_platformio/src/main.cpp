@@ -48,6 +48,14 @@ void setup(void)
 
   matrix.initMatrix();
 
+  delay(10);
+
+  matrix.drawLine(0,0,77,77,255,255,255);
+
+  matrix.drawCircle(30,30,5,254,254,254);
+
+  matrix.update();  
+
 
 
 }
@@ -55,7 +63,11 @@ void setup(void)
 float angle = 0.0f;
 uint16_t r,g,b;
 int frame_count = 0;
-void loop() 
+void loop()
+{
+
+}
+void loop2() 
 {
   static unsigned long lastTime = 0;
   unsigned long currentTime = millis();
