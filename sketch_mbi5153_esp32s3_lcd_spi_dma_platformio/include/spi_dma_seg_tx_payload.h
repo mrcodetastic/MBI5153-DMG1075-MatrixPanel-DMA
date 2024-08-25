@@ -45,10 +45,10 @@ uint8_t getByteValue(int position) {
 
     // Handle padding
     if (offset < PADDING_SIZE || offset >= PADDING_SIZE + SEQUENCE_SIZE) {
-         // return (repeatValue << 2);
+		// return (repeatValue << 2);
 
-		 // fix slight gclk sync out of sync on ESP32S3... causes image on panel to get out of sync with rowscan and slide around
-         return 0x80 | (repeatValue << 2);	
+		// fix slight gclk sync out of sync on ESP32S3... causes image on panel to get out of sync with rowscan and slide around
+		return 0x80 | (repeatValue << 2);	
     }    
 
     // Calculate the byte value based on its position in the repeat
