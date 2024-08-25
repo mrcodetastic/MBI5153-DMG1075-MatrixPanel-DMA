@@ -582,7 +582,7 @@ class Matrix : public GFX {
     The 16384 GCLKs (14-bit) PWM cycle of MBI5052/53 is divided into 32 sections, each section has 512 GCLKs.
   */
 
-  // Includes 14-bit CIE lookup vs mbi_set_pixel_old that doesn't
+  // Includes CIE lookup vs mbi_set_pixel_old that doesn't
   void mbi_set_pixel(uint8_t x, uint8_t y, uint8_t _r_data, uint8_t _g_data, uint8_t _b_data) {
     
     if (x >= PANEL_PHY_RES_X || y >= PANEL_PHY_RES_Y) {
