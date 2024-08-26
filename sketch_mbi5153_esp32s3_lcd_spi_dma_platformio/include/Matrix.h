@@ -589,6 +589,7 @@ class Matrix : public GFX {
       return;
     }
 
+    // CIE looked up
     uint8_t r_data = CIE[_r_data];
     uint8_t g_data = CIE[_g_data];
     uint8_t b_data = CIE[_b_data];
